@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "lib": ["esnext", "webworker"],
+        "alwaysStrict": true,
+        "strict": true,
+        "preserveConstEnums": true,
+        "moduleResolution": "node",
+        "inlineSourceMap": true,
+        "esModuleInterop": true,
+        "noEmit": true
+    },
+    "include": ["./src/*.ts"],
+    "exclude": ["node_modules/", "dist/"]
+}
