@@ -1,5 +1,5 @@
 import { WorkerKVStore } from "./kv";
-import { Database, Configuration, Collection } from "./database";
+import { Database, Collection } from "./database";
 import { AdminConfig, Post } from "./models";
 
 const kv = new WorkerKVStore(TEST_KV);
@@ -12,8 +12,15 @@ addEventListener("fetch", event => {
 });
 
 async function handleRequest(request: Request) {
+    await postCollection.set("www", new Post({ title: "wow" }));
+
+    const response = `\
+correct password: ${await adminConfig.checkPasscode("secret")}
+posts: [${(await postCollection.list("")).join(", ")}]
+`;
+
     return new Response(
-        "pass hash: " + (await adminConfig.checkPasscode("secret")),
+        response,
         {
             headers: { "content-type": "text/plain" },
         }

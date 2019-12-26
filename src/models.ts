@@ -1,4 +1,4 @@
-import { Configuration, Database } from "./database";
+import { Configuration, Database, PartialRecord } from "./database";
 import BLAKE2s from "blake2s-js";
 
 /**
@@ -58,13 +58,14 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
  * Class representing a (blog) post
  */
 export class Post {
+    public id: number = 0;
     public title: string = "(untitled)";
     public content: string = "";
 
     public timeOfCreation: number; // number of milliseconds since the Unix Epoch
     public timeOfLastEdit: number;
 
-    constructor(config: Record<keyof Post, any>) {
+    constructor(config: PartialRecord<Post>) {
         this.timeOfCreation = new Date().getTime();
         this.timeOfLastEdit = new Date().getTime();
 

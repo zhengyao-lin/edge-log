@@ -8,7 +8,7 @@ export class Database {
         this.baseKV = baseKV;
     }
 
-    async getRawAs<T>(key: string): Promise<T | null> {
+    async getJSON(key: string): Promise<any> {
         const stringValue = await this.baseKV.get(key);
 
         if (stringValue === null) {
@@ -16,11 +16,15 @@ export class Database {
         }
 
         // TODO: need runtime type checking
-        return JSON.parse(stringValue) as T;
+        return JSON.parse(stringValue);
     }
 
-    async setRaw(key: string, obj: any) {
+    async setJSON(key: string, obj: any) {
         await this.baseKV.set(key, JSON.stringify(obj));
+    }
+
+    async list(prefix: string): Promise<string[]> {
+        return this.baseKV.list(prefix);
     }
 }
 
@@ -56,17 +60,19 @@ export abstract class Configuration<T> {
      */
     private async sync() {
         if (this.config !== null) {
-            await this.db.setRaw(this.getRawKey(), this.config);
+            await this.db.setJSON(this.getRawKey(), this.config);
         } // if the config is null, we must have not changed it
     }
 
     private async fetch() {
         if (this.config === null) {
-            this.config = await this.db.getRawAs<T>(this.getRawKey());
+            this.config = this.default();
 
-            // not set in the database
-            if (this.config === null) {
-                this.config = this.default();
+            const upstream = await this.db.getJSON(this.getRawKey());
+
+            // upstream config exists
+            if (upstream !== null) {
+                Object.assign(this.config, upstream);
             }
         }
     }
@@ -76,7 +82,9 @@ export abstract class Configuration<T> {
     }
 }
 
-export type ObjectConstructor<T> = new (c: Record<keyof T, any>) => T;
+export type PartialRecordHelper<T, K extends keyof T> = { [P in K]?: T[P] };
+export type PartialRecord<T> = PartialRecordHelper<T, keyof T>;
+export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
 
 /**
  * A collection is a string-indexed object store
@@ -101,7 +109,10 @@ export class Collection<T> {
 
     async get(key: string): Promise<T | null> {
         // uninstantiated object
-        const raw = await this.db.getRawAs<Record<keyof T, any>>(this.getRawKey(key));
+        const raw = (await this.db.getJSON(this.getRawKey(key))) as Record<
+            keyof T,
+            any
+        >;
 
         if (raw === null) return null;
 
@@ -109,7 +120,19 @@ export class Collection<T> {
     }
 
     async set(key: string, obj: T) {
-        await this.db.setRaw(key, obj);
+        await this.db.setJSON(this.getRawKey(key), obj);
+    }
+
+    async list(prefix: string = ""): Promise<string[]> {
+        const rawPrefix = this.getRawKey(prefix);
+        const rawKeys = await this.db.list(rawPrefix);
+        const prefixLength = rawPrefix.length;
+    
+        rawKeys.forEach((value, i, array) => {
+            array[i] = value.substring(prefixLength);
+        });
+
+        return rawKeys;
     }
 
     /**
