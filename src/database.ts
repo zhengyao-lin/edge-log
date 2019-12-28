@@ -1,30 +1,159 @@
 import { KVStore } from "./kv";
 import { assert } from "./utils";
 
-export class Database {
-    private baseKV: KVStore<string, string>;
+export type Path = string[];
 
-    constructor(baseKV: KVStore<string, string>) {
-        this.baseKV = baseKV;
+export interface PathScheme {
+    /**
+     * encode/decode must be bijective
+     * and have the property that
+     * for all a: string, b: string, path: Path,
+     * a is a prefix of b => encode(path + [a]) is a prefix of encode(path + [b])
+     */
+    encode(path: Path): string;
+    decode(key: string): Path;
+}
+
+export class URIPathScheme implements PathScheme {
+    constructor() {}
+
+    encode(path: Path): string {
+        return path.map(encodeURIComponent).join("/");
     }
 
-    async getJSON(key: string): Promise<any> {
-        const stringValue = await this.baseKV.get(key);
+    decode(key: string): Path {
+        return key.split("/").map(decodeURIComponent);
+    }
+}
+
+export class SeparatorPathScheme implements PathScheme {
+    private escapeChars: number[];
+
+    constructor(private separator: number = 0) {
+        this.separator = this.separator % 256;
+        this.escapeChars = [(separator + 1) % 256, (separator + 2) % 256];
+    }
+
+    encode(path: Path): string {
+        return path
+            .map(this.escapePathComponent.bind(this))
+            .join(String.fromCharCode(this.separator));
+    }
+
+    decode(key: string): Path {
+        return key
+            .split(String.fromCharCode(this.separator))
+            .map(this.unescapePathComponent.bind(this));
+    }
+
+    private escapePathComponent(str: string): string {
+        // suppose t is the separator code
+        // let a, b be two arbitrary characters where a /= t and b /= t
+        // then the following character transformation is a bijection
+        // a -> aa
+        // b -> bb
+        // t -> ab
+        // _ -> _
+
+        const t = this.separator;
+        const [a, b] = this.escapeChars;
+
+        let charA = a.toString(16),
+            charB = b.toString(16),
+            charT = t.toString(16);
+
+        if (charA.length == 1) charA = "0" + charA;
+        if (charB.length == 1) charB = "0" + charB;
+        if (charT.length == 1) charT = "0" + charT;
+
+        const regex = RegExp(`[\\x${charA}\\x${charB}\\x${charT}]`, "g");
+
+        return str.replace(regex, substr => {
+            const code = substr.charCodeAt(0);
+
+            if (code == a) {
+                return String.fromCharCode(a, a);
+            } else if (code == b) {
+                return String.fromCharCode(b, b);
+            } else {
+                return String.fromCharCode(a, b);
+            }
+        });
+    }
+
+    /**
+     * inverse of escapePathComponent
+     */
+    private unescapePathComponent(str: string): string {
+        const [a, b] = this.escapeChars;
+
+        let charA = a.toString(16),
+            charB = b.toString(16);
+
+        if (charA.length == 1) charA = "0" + charA;
+        if (charB.length == 1) charB = "0" + charB;
+
+        const regex = RegExp(
+            `\\x${charA}\\x${charA}|\\x${charA}\\x${charB}|\\x${charB}\\x${charB}`,
+            "g"
+        );
+
+        return str.replace(regex, substr => {
+            if (substr == String.fromCharCode(a, a)) {
+                return String.fromCharCode(a);
+            } else if (substr == String.fromCharCode(b, b)) {
+                return String.fromCharCode(b);
+            } else {
+                // a b
+                return String.fromCharCode(this.separator);
+            }
+        });
+    }
+}
+
+export class Database {
+    constructor(
+        private baseKV: KVStore<string, string>,
+        private pathScheme: PathScheme = new URIPathScheme()
+    ) {}
+
+    async getJSON(path: Path): Promise<any> {
+        const stringValue = await this.baseKV.get(this.pathScheme.encode(path));
 
         if (stringValue === null) {
             return null;
         }
 
         // TODO: need runtime type checking
-        return JSON.parse(stringValue);
+        try {
+            return JSON.parse(stringValue);
+        } catch (e) {
+            return null; // treat ill-formatted content as null
+        }
     }
 
-    async setJSON(key: string, obj: any) {
-        await this.baseKV.set(key, JSON.stringify(obj));
+    async setJSON(path: Path, obj: any) {
+        await this.baseKV.set(
+            this.pathScheme.encode(path),
+            JSON.stringify(obj)
+        );
     }
 
-    async list(prefix: string): Promise<string[]> {
-        return this.baseKV.list(prefix);
+    /**
+     * return keys of kv pairs under a path (only the last path component is returned)
+     */
+    async list(path: Path, prefix: string = ""): Promise<string[]> {
+        const keys = await this.baseKV.list(
+            this.pathScheme.encode(path.concat([prefix]))
+        );
+
+        return keys
+            .map(this.pathScheme.decode.bind(this.pathScheme))
+            .filter(p => p.length == path.length + 1)
+            .map(p => {
+                assert(p.length > 0, "empty path");
+                return p[p.length - 1];
+            });
     }
 }
 
@@ -32,15 +161,9 @@ export class Database {
  * Configuration is a cached single object
  */
 export abstract class Configuration<T> {
-    private db: Database;
-    private name: string;
-    private config: T | null;
+    private config: T | null = null;
 
-    constructor(db: Database, name: string) {
-        this.db = db;
-        this.name = name;
-        this.config = null;
-    }
+    constructor(private db: Database, private path: Path) {}
 
     protected abstract default(): T;
 
@@ -60,7 +183,7 @@ export abstract class Configuration<T> {
      */
     private async sync() {
         if (this.config !== null) {
-            await this.db.setJSON(this.getRawKey(), this.config);
+            await this.db.setJSON(this.path, this.config);
         } // if the config is null, we must have not changed it
     }
 
@@ -68,7 +191,7 @@ export abstract class Configuration<T> {
         if (this.config === null) {
             this.config = this.default();
 
-            const upstream = await this.db.getJSON(this.getRawKey());
+            const upstream = await this.db.getJSON(this.path);
 
             // upstream config exists
             if (upstream !== null) {
@@ -76,14 +199,9 @@ export abstract class Configuration<T> {
             }
         }
     }
-
-    private getRawKey(): string {
-        return "$" + this.name;
-    }
 }
 
-export type PartialRecordHelper<T, K extends keyof T> = { [P in K]?: T[P] };
-export type PartialRecord<T> = PartialRecordHelper<T, keyof T>;
+export type PartialRecord<T> = { [P in keyof T]?: T[P] };
 export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
 
 /**
@@ -91,25 +209,15 @@ export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
  * with a specific object type
  */
 export class Collection<T> {
-    private db: Database;
-    private name: string;
-
-    private cons: ObjectConstructor<T>;
-
-    constructor(db: Database, name: string, cons: ObjectConstructor<T>) {
-        assert(
-            !name.includes("$") && name !== "",
-            `invalid collection name "${name}"`
-        );
-
-        this.db = db;
-        this.name = name;
-        this.cons = cons;
-    }
+    constructor(
+        private db: Database,
+        private path: Path,
+        private cons: ObjectConstructor<T>
+    ) {}
 
     async get(key: string): Promise<T | null> {
         // uninstantiated object
-        const raw = (await this.db.getJSON(this.getRawKey(key))) as Record<
+        const raw = (await this.db.getJSON(this.path.concat([key]))) as Record<
             keyof T,
             any
         >;
@@ -120,25 +228,10 @@ export class Collection<T> {
     }
 
     async set(key: string, obj: T) {
-        await this.db.setJSON(this.getRawKey(key), obj);
+        await this.db.setJSON(this.path.concat([key]), obj);
     }
 
     async list(prefix: string = ""): Promise<string[]> {
-        const rawPrefix = this.getRawKey(prefix);
-        const rawKeys = await this.db.list(rawPrefix);
-        const prefixLength = rawPrefix.length;
-    
-        rawKeys.forEach((value, i, array) => {
-            array[i] = value.substring(prefixLength);
-        });
-
-        return rawKeys;
-    }
-
-    /**
-     * get the actual key in the raw database
-     */
-    private getRawKey(key: string): string {
-        return this.name + "$" + key;
+        return await this.db.list(this.path, prefix);
     }
 }

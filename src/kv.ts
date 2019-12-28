@@ -15,6 +15,24 @@ export abstract class KVStore<K, V> {
     }
 }
 
+// export class PrefixedKVStore<V> extends KVStore<string, V> {
+//     constructor(private prefix: string, private store: KVStore<string, V>) {
+//         super();
+//     }
+
+//     async get(key: string): Promise<V | null> {
+//         return await this.store.get(this.prefix + key);
+//     }
+
+//     async set(key: string, value: V): Promise<void> {
+//         await this.store.set(this.prefix + key, value);
+//     }
+
+//     async list(prefix: string): Promise<string[]> {
+//         return await this.store.list(this.prefix + prefix);
+//     }
+// }
+
 export class MemoryStringKVStore<V> extends KVStore<string, V> {
     private map: Map<string, V>;
 
@@ -33,26 +51,23 @@ export class MemoryStringKVStore<V> extends KVStore<string, V> {
     }
 
     async list(prefix: string): Promise<string[]> {
-        return Array.from(this.map.keys());
+        return Array.from(this.map.keys()).filter(s => s.startsWith(prefix));
     }
 }
 
 /**
  * A wrapper for the worker kv store
  */
-export class WorkerKVStore extends KVStore<string, string> {
-    private namespace: KVNamespace;
-
-    constructor(namespace: KVNamespace) {
+export abstract class WorkerKVStore<
+    V extends string | ReadableStream
+> extends KVStore<string, V> {
+    constructor(protected namespace: KVNamespace) {
         super();
-        this.namespace = namespace;
     }
 
-    async get(key: string): Promise<string | null> {
-        return await this.namespace.get(key);
-    }
+    abstract async get(key: string): Promise<V | null>;
 
-    async set(key: string, value: string): Promise<void> {
+    async set(key: string, value: V): Promise<void> {
         await this.namespace.put(key, value);
     }
 
@@ -65,5 +80,17 @@ export class WorkerKVStore extends KVStore<string, string> {
         }
 
         return keys;
+    }
+}
+
+export class WorkerStringKVStore extends WorkerKVStore<string> {
+    async get(key: string): Promise<string | null> {
+        return await this.namespace.get(key);
+    }
+}
+
+export class WorkerStreamKVStore extends WorkerKVStore<ReadableStream> {
+    async get(key: string): Promise<ReadableStream | null> {
+        return await this.namespace.get(key, "stream");
     }
 }
