@@ -1,5 +1,6 @@
 import { Configuration, Database, PartialRecord } from "./database";
 import BLAKE2s from "blake2s-js";
+import { uuid4 } from "./utils";
 
 /**
  * Models for a single-admin blogging platform
@@ -58,8 +59,8 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
  * Class representing a (blog) post
  */
 export class Post {
-    public id: number = 0;
-    public title: string = "(untitled)";
+    public id: string;
+    public title: string = "";
     public content: string = "";
 
     public timeOfCreation: number; // number of milliseconds since the Unix Epoch
@@ -68,6 +69,8 @@ export class Post {
     constructor(config: PartialRecord<Post>) {
         this.timeOfCreation = new Date().getTime();
         this.timeOfLastEdit = new Date().getTime();
+
+        this.id = this.timeOfCreation.toString() + "-" + uuid4();
 
         Object.assign(this, config);
     }

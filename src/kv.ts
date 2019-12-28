@@ -6,6 +6,7 @@ import { KVNamespace } from "@cloudflare/workers-types";
 export abstract class KVStore<K, V> {
     abstract async get(key: K): Promise<V | null>;
     abstract async set(key: K, value: V): Promise<void>;
+    abstract async delete(key: K): Promise<void>;
     abstract async list(prefix: string): Promise<K[]>;
 
     async setBatch(keyValuePairs: [K, V][]): Promise<void> {
@@ -15,23 +16,27 @@ export abstract class KVStore<K, V> {
     }
 }
 
-// export class PrefixedKVStore<V> extends KVStore<string, V> {
-//     constructor(private prefix: string, private store: KVStore<string, V>) {
-//         super();
-//     }
+export class PrefixedKVStore<V> extends KVStore<string, V> {
+    constructor(private prefix: string, private store: KVStore<string, V>) {
+        super();
+    }
 
-//     async get(key: string): Promise<V | null> {
-//         return await this.store.get(this.prefix + key);
-//     }
+    async get(key: string): Promise<V | null> {
+        return await this.store.get(this.prefix + key);
+    }
 
-//     async set(key: string, value: V): Promise<void> {
-//         await this.store.set(this.prefix + key, value);
-//     }
+    async set(key: string, value: V): Promise<void> {
+        await this.store.set(this.prefix + key, value);
+    }
 
-//     async list(prefix: string): Promise<string[]> {
-//         return await this.store.list(this.prefix + prefix);
-//     }
-// }
+    async delete(key: string): Promise<void> {
+        await this.store.delete(this.prefix + key);
+    }
+
+    async list(prefix: string): Promise<string[]> {
+        return await this.store.list(this.prefix + prefix);
+    }
+}
 
 export class MemoryStringKVStore<V> extends KVStore<string, V> {
     private map: Map<string, V>;
@@ -48,6 +53,10 @@ export class MemoryStringKVStore<V> extends KVStore<string, V> {
 
     async set(key: string, value: V): Promise<void> {
         this.map.set(key, value);
+    }
+
+    async delete(key: string): Promise<void> {
+        this.map.delete(key);
     }
 
     async list(prefix: string): Promise<string[]> {
@@ -69,6 +78,10 @@ export abstract class WorkerKVStore<
 
     async set(key: string, value: V): Promise<void> {
         await this.namespace.put(key, value);
+    }
+
+    async delete(key: string): Promise<void> {
+        await this.namespace.delete(key);
     }
 
     async list(prefix: string): Promise<string[]> {

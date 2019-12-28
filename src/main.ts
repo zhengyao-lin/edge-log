@@ -1,24 +1,58 @@
 import { WorkerStringKVStore } from "./kv";
-import { Database, Collection } from "./database";
-import { AdminConfig, Post } from "./models";
+import { Database } from "./database";
+import { EdgeLog } from "./blog";
 
 const kv = new WorkerStringKVStore(TEST_KV);
 const db = new Database(kv);
-const adminConfig = new AdminConfig(db, ["admin-config"]);
-const postCollection = new Collection(db, ["posts"], Post);
+const blog = new EdgeLog(db);
 
 addEventListener("fetch", event => {
     event.respondWith(handleRequest(event.request));
 });
 
 async function handleRequest(request: Request) {
-    await adminConfig.setPasscode("secret");
-    await postCollection.set("www", new Post({ title: "wow" }));
+    const url = new URL(request.url);
+    let response;
 
-    const response = `\
-correct password: ${await adminConfig.checkPasscode("secret")}
-posts: [${(await postCollection.list("")).join(", ")}]
-`;
+    /**
+     * POST /api/login
+     *   - passcode: string
+     *
+     * POST /api/post
+     *   - title: string
+     *   - content: string
+     *
+     * PUT /api/post
+     *   - id: string
+     *   - title: string
+     *   - content: string
+     *
+     * GET /api/post
+     *   - id: string
+     */
+
+    switch (url.pathname) {
+        case "/login": {
+            const passcode = url.searchParams.get("passcode");
+
+            if (passcode === null) {
+                response = "400 bad request";
+            } else {
+                const session = await blog.login(passcode);
+
+                if (session === null) {
+                    response = "wrong passcode";
+                } else {
+                    response = "session: " + session.id;
+                }
+            }
+
+            break;
+        }
+
+        default:
+            response = "404 not found";
+    }
 
     return new Response(response, {
         headers: { "content-type": "text/plain" },

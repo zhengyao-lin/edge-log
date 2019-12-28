@@ -111,6 +111,9 @@ export class SeparatorPathScheme implements PathScheme {
     }
 }
 
+/**
+ * kv database using JSON for encoding
+ */
 export class Database {
     constructor(
         private baseKV: KVStore<string, string>,
