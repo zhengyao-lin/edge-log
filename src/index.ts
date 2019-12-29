@@ -1,9 +1,10 @@
-import { WorkerStringKVStore } from "./kv";
-import { Database } from "./database";
-import { EdgeLog } from "./blog";
+import { PathJSONStore } from "./storage/path";
+import { EdgeLog } from "./core/blog";
+
+import { WorkerStringKVStore } from "./worker";
 
 const kv = new WorkerStringKVStore(TEST_KV);
-const db = new Database(kv);
+const db = new PathJSONStore(kv);
 const blog = new EdgeLog(db);
 
 addEventListener("fetch", event => {

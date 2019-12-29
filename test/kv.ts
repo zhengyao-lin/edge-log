@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { MemoryStringKVStore, KVStore } from "../src/kv";
+import { MemoryStringKVStore, KVStore } from "../src/storage/kv";
 
 describe("kv basics", () => {
     it("get/set values correctly", async () => {

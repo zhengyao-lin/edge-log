@@ -4,9 +4,9 @@ const mode = process.env.NODE_ENV || "production";
 
 module.exports = {
     mode,
-    entry: "./src/main.ts",
+    entry: "./src/index.ts",
     output: {
-        filename: `main.js`,
+        filename: `index.js`,
         path: path.join(__dirname, "dist"),
     },
     devtool: "inline-source-map",

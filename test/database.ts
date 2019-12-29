@@ -1,7 +1,7 @@
 import { expect } from "chai";
 
-import { Path, Database, SeparatorPathScheme } from "../src/database";
-import { MemoryStringKVStore } from "../src/kv";
+import { Path, PathJSONStore, SeparatorPathScheme } from "../src/storage/path";
+import { MemoryStringKVStore } from "../src/storage/kv";
 
 describe("separator path scheme", () => {
     it("is bijective", () => {
@@ -19,19 +19,19 @@ describe("separator path scheme", () => {
     });
 });
 
-describe("database basics", () => {
+describe("PathJSONStore basics", () => {
     it("set/get/list values correctly", async () => {
-        const db = new Database(new MemoryStringKVStore());
+        const store = new PathJSONStore(new MemoryStringKVStore());
 
-        await db.setJSON(["this", "is", "a", "path"], { a: 1, b: 2 });
-        await db.setJSON(["this", "is", "2nd", "path"], { a: 1, b: 3 });
-        await db.setJSON(["this", "is not", "a", "path"], { a: 1, b: 4 });
+        await store.set(["this", "is", "a", "path"], { a: 1, b: 2 });
+        await store.set(["this", "is", "2nd", "path"], { a: 1, b: 3 });
+        await store.set(["this", "is not", "a", "path"], { a: 1, b: 4 });
 
-        expect(await db.getJSON(["this", "is", "2nd", "path"])).eql({
+        expect(await store.get(["this", "is", "2nd", "path"])).eql({
             a: 1,
             b: 3,
         });
-        expect(await db.getJSON(["this", "is", "eee"])).equals(null);
-        expect(await db.list(["this", "is", "a"])).members(["path"]);
+        expect(await store.get(["this", "is", "eee"])).equals(null);
+        expect(await store.list(["this", "is", "a"])).eql([["this", "is", "a", "path"]]);
     });
 });

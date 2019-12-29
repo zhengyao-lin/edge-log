@@ -1,6 +1,6 @@
-import { Configuration, Database, PartialRecord } from "./database";
+import { Configuration, PartialRecord, PrimaryKey } from "../storage/container";
 import BLAKE2s from "blake2s-js";
-import { uuid4 } from "./utils";
+import { uuid4 } from "../utils";
 
 /**
  * Models for a single-admin blogging platform
@@ -59,6 +59,13 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
  * Class representing a (blog) post
  */
 export class Post {
+    static SCHEMA = {
+        id:             PrimaryKey.ReadOnly,
+        title:          PrimaryKey.Default,
+        timeOfCreation: PrimaryKey.ReadOnly,
+        timeOfLastEdit: PrimaryKey.Default
+    };
+
     public id: string;
     public title: string = "";
     public content: string = "";

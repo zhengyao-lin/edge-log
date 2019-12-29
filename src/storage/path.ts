@@ -1,7 +1,8 @@
 import { KVStore } from "./kv";
-import { assert } from "./utils";
+import { assert } from "../utils";
 
 export type Path = string[];
+export type JSONEncodable = any;
 
 export interface PathScheme {
     /**
@@ -112,16 +113,18 @@ export class SeparatorPathScheme implements PathScheme {
 }
 
 /**
- * kv database using JSON for encoding
+ * A "path"-indexed kv store for storing JSON encoded objects
  */
-export class Database {
+export class PathJSONStore extends KVStore<Path, JSONEncodable> {
     constructor(
-        private baseKV: KVStore<string, string>,
+        private base: KVStore<string, string>,
         private pathScheme: PathScheme = new URIPathScheme()
-    ) {}
+    ) {
+        super();
+    }
 
-    async getJSON(path: Path): Promise<any> {
-        const stringValue = await this.baseKV.get(this.pathScheme.encode(path));
+    async get(path: Path): Promise<JSONEncodable | null> {
+        const stringValue = await this.base.get(this.pathScheme.encode(path));
 
         if (stringValue === null) {
             return null;
@@ -135,106 +138,23 @@ export class Database {
         }
     }
 
-    async setJSON(path: Path, obj: any) {
-        await this.baseKV.set(
+    async set(path: Path, obj: JSONEncodable): Promise<void> {
+        await this.base.set(
             this.pathScheme.encode(path),
             JSON.stringify(obj)
         );
     }
 
+    async delete(path: Path): Promise<void> {
+        await this.base.delete(this.pathScheme.encode(path));
+    }
+
     /**
      * return keys of kv pairs under a path (only the last path component is returned)
      */
-    async list(path: Path, prefix: string = ""): Promise<string[]> {
-        const keys = await this.baseKV.list(
-            this.pathScheme.encode(path.concat([prefix]))
-        );
+    async list(prefix: Path): Promise<Path[]> {
+        const keys = await this.base.list(this.pathScheme.encode(prefix));
 
-        return keys
-            .map(this.pathScheme.decode.bind(this.pathScheme))
-            .filter(p => p.length == path.length + 1)
-            .map(p => {
-                assert(p.length > 0, "empty path");
-                return p[p.length - 1];
-            });
-    }
-}
-
-/**
- * Configuration is a cached single object
- */
-export abstract class Configuration<T> {
-    private config: T | null = null;
-
-    constructor(private db: Database, private path: Path) {}
-
-    protected abstract default(): T;
-
-    async set<K extends keyof T>(key: K, value: T[K]) {
-        await this.fetch();
-        (this.config as T)[key] = value;
-        await this.sync();
-    }
-
-    async get<K extends keyof T>(key: K): Promise<T[K]> {
-        await this.fetch();
-        return (this.config as T)[key];
-    }
-
-    /**
-     * Syncrhonize changes
-     */
-    private async sync() {
-        if (this.config !== null) {
-            await this.db.setJSON(this.path, this.config);
-        } // if the config is null, we must have not changed it
-    }
-
-    private async fetch() {
-        if (this.config === null) {
-            this.config = this.default();
-
-            const upstream = await this.db.getJSON(this.path);
-
-            // upstream config exists
-            if (upstream !== null) {
-                Object.assign(this.config, upstream);
-            }
-        }
-    }
-}
-
-export type PartialRecord<T> = { [P in keyof T]?: T[P] };
-export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
-
-/**
- * A collection is a string-indexed object store
- * with a specific object type
- */
-export class Collection<T> {
-    constructor(
-        private db: Database,
-        private path: Path,
-        private cons: ObjectConstructor<T>
-    ) {}
-
-    async get(key: string): Promise<T | null> {
-        // uninstantiated object
-        const raw = (await this.db.getJSON(this.path.concat([key]))) as Record<
-            keyof T,
-            any
-        >;
-
-        if (raw === null) return null;
-
-        return new this.cons(raw);
-    }
-
-    async set(key: string, obj: T) {
-        await this.db.setJSON(this.path.concat([key]), obj);
-    }
-
-    async list(prefix: string = ""): Promise<string[]> {
-        return await this.db.list(this.path, prefix);
+        return keys.map(this.pathScheme.decode.bind(this.pathScheme));
     }
 }

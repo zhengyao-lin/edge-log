@@ -1,5 +1,3 @@
-import { KVNamespace } from "@cloudflare/workers-types";
-
 /**
  * An abstraction for a simple kv store
  */
@@ -7,7 +5,7 @@ export abstract class KVStore<K, V> {
     abstract async get(key: K): Promise<V | null>;
     abstract async set(key: K, value: V): Promise<void>;
     abstract async delete(key: K): Promise<void>;
-    abstract async list(prefix: string): Promise<K[]>;
+    abstract async list(prefix: K): Promise<K[]>;
 
     async setBatch(keyValuePairs: [K, V][]): Promise<void> {
         for (const [k, v] of keyValuePairs) {
@@ -61,49 +59,5 @@ export class MemoryStringKVStore<V> extends KVStore<string, V> {
 
     async list(prefix: string): Promise<string[]> {
         return Array.from(this.map.keys()).filter(s => s.startsWith(prefix));
-    }
-}
-
-/**
- * A wrapper for the worker kv store
- */
-export abstract class WorkerKVStore<
-    V extends string | ReadableStream
-> extends KVStore<string, V> {
-    constructor(protected namespace: KVNamespace) {
-        super();
-    }
-
-    abstract async get(key: string): Promise<V | null>;
-
-    async set(key: string, value: V): Promise<void> {
-        await this.namespace.put(key, value);
-    }
-
-    async delete(key: string): Promise<void> {
-        await this.namespace.delete(key);
-    }
-
-    async list(prefix: string): Promise<string[]> {
-        const list = await this.namespace.list({ prefix });
-        const keys = [];
-
-        for (const { name } of list.keys) {
-            keys.push(name);
-        }
-
-        return keys;
-    }
-}
-
-export class WorkerStringKVStore extends WorkerKVStore<string> {
-    async get(key: string): Promise<string | null> {
-        return await this.namespace.get(key);
-    }
-}
-
-export class WorkerStreamKVStore extends WorkerKVStore<ReadableStream> {
-    async get(key: string): Promise<ReadableStream | null> {
-        return await this.namespace.get(key, "stream");
     }
 }
