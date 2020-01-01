@@ -1,6 +1,5 @@
 import {
     Configuration,
-    PartialRecord,
     KeyProperty,
 } from "../storage/container";
 import BLAKE2s from "blake2s-js";
@@ -73,7 +72,7 @@ export class Post {
     public timeOfCreation: number; // number of milliseconds since the Unix Epoch
     public timeOfLastEdit: number;
 
-    constructor(config: PartialRecord<Post>) {
+    constructor(config: Partial<Post>) {
         this.timeOfCreation = new Date().getTime();
         this.timeOfLastEdit = new Date().getTime();
 

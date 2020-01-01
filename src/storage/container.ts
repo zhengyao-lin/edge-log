@@ -101,9 +101,8 @@ export type PrimaryKey = number | boolean | string;
  */
 
 export type Schema<T> = { [K in keyof T]?: Symbol };
-export type PartialRecord<T> = { [K in keyof T]?: T[K] };
 
-export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
+export type ObjectConstructor<T> = new (c: Partial<T>) => T;
 export type ObjectWithSchema<T> = { SCHEMA: Schema<T> };
 
 /**
@@ -444,7 +443,7 @@ export class Collection<T> {
         const dataKeys = await this.base.get(this.path.concat(rawKey));
         if (dataKeys === null) return null;
 
-        const partial: PartialRecord<T> = {
+        const partial: Partial<T> = {
             ...primaryKeys,
             ...dataKeys,
         };

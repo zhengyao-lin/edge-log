@@ -1,5 +1,5 @@
 import { PathJSONStore } from "../storage/path";
-import { Collection, PartialRecord, KeyProperty } from "../storage/container";
+import { Collection, KeyProperty } from "../storage/container";
 import { AdminConfig, Post } from "./models";
 import { uuid4 } from "../utils";
 
@@ -10,7 +10,7 @@ export class Session {
     @KeyProperty.primary(Session)
     private timeOfCreation: number;
 
-    constructor(config: PartialRecord<Session> = {}) {
+    constructor(config: Partial<Session> = {}) {
         this.id = uuid4();
         this.timeOfCreation = new Date().getTime();
 

@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import {
-    PartialRecord,
     KeyProperty,
     Collection,
 } from "../src/storage/container";
@@ -16,7 +15,7 @@ class People {
 
     public age: number = 0;
 
-    constructor(config: PartialRecord<People>) {
+    constructor(config: Partial<People>) {
         Object.assign(this, config);
     }
 }

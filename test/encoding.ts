@@ -6,6 +6,7 @@ import {
     SeparatorPathEncoding,
 } from "../src/storage/path";
 import { MemoryStringKVStore } from "../src/storage/kv";
+import { CookieJar } from "../src/application";
 
 describe("separator path scheme", () => {
     it("is bijective", () => {

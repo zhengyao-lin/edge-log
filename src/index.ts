@@ -2,7 +2,7 @@ import { PathJSONStore } from "./storage/path";
 import { EdgeLog } from "./core/blog";
 
 import { WorkerStringKVStore } from "./worker";
-import { Application, ResponseObject, ParsedRequest } from "./application";
+import { Application, HTTPResponse, HTTPRequest } from "./application";
 
 const kv = new WorkerStringKVStore(TEST_KV);
 const db = new PathJSONStore(kv);
@@ -10,34 +10,28 @@ const blog = new EdgeLog(db);
 
 class MainApplication extends Application {
     @Application.get("/login")
-    async handleLogin(request: ParsedRequest): Promise<ResponseObject> {
+    async handleLogin(
+        request: HTTPRequest
+    ): Promise<HTTPResponse> {
         const passcode = request.url.searchParams.get("passcode");
 
         if (passcode === null) {
             // check for cookie
-            const cookie = request.headers.get("cookie");
-
-            if (cookie === null) {
+            if (request.cookie["session-id"] === undefined) {
                 return { text: "400 bad request", status: 400 };
             } else {
-                const match = /session-id=([a-fA-F0-9-]+)/.exec(cookie);
+                const id = request.cookie["session-id"];
+                const session = await blog.checkSession(id);
 
-                if (match === null) {
-                    return { text: "400 bad request", status: 400 };
+                if (session === null) {
+                    return {
+                        text: `illegal session id ${id}`,
+                        status: 400,
+                    };
                 } else {
-                    const id = match[1];
-                    const session = await blog.checkSession(id);
-
-                    if (session === null) {
-                        return {
-                            text: `illegal session id ${id}`,
-                            status: 400,
-                        };
-                    } else {
-                        return {
-                            text: `found session id ${id}; first login ${session.getTimeOfCreation()}`,
-                        };
-                    }
+                    return {
+                        text: `found session id ${id}; first login ${session.getTimeOfCreation()}`,
+                    };
                 }
             }
         } else {
@@ -49,7 +43,7 @@ class MainApplication extends Application {
                 return {
                     text: `session: ${session.id}`,
                     headers: {
-                        setCookie: `session-id=${session.id}`,
+                        "set-cookie": { "session-id": session.id },
                     },
                 };
             }
