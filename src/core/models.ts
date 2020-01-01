@@ -1,7 +1,7 @@
 import {
     Configuration,
     PartialRecord,
-    PrimaryKeyProperty,
+    KeyProperty,
 } from "../storage/container";
 import BLAKE2s from "blake2s-js";
 import { uuid4 } from "../utils";
@@ -63,17 +63,13 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
  * Class representing a (blog) post
  */
 export class Post {
-    static SCHEMA = {
-        id: PrimaryKeyProperty.Unique,
-        title: PrimaryKeyProperty.Default,
-        timeOfCreation: PrimaryKeyProperty.Default,
-        timeOfLastEdit: PrimaryKeyProperty.Default,
-    };
-
+    @KeyProperty.unique(Post)
     public id: string;
+
     public title: string = "";
     public content: string = "";
 
+    @KeyProperty.primary(Post)
     public timeOfCreation: number; // number of milliseconds since the Unix Epoch
     public timeOfLastEdit: number;
 
@@ -81,7 +77,7 @@ export class Post {
         this.timeOfCreation = new Date().getTime();
         this.timeOfLastEdit = new Date().getTime();
 
-        this.id = this.timeOfCreation.toString() + "-" + uuid4();
+        this.id = uuid4();
 
         Object.assign(this, config);
     }

@@ -63,13 +63,35 @@ export abstract class Configuration<T> {
  *
  * Primary keys are readonly
  */
-export enum PrimaryKeyProperty {
-    Default,
+export class KeyProperty {
+    static readonly SCHEMA_NAME: unique symbol = Symbol();
+    static readonly PRIMARY_DEFAULT: unique symbol = Symbol();
+    static readonly PRIMARY_UNIQUE: unique symbol = Symbol();
+
+    static createSchema(classObj: any) {
+        if (!classObj.hasOwnProperty(KeyProperty.SCHEMA_NAME)) {
+            classObj[KeyProperty.SCHEMA_NAME] = {};
+        }
+    }
+
+    static primary(classObj: any) {
+        return (target: any, key: string) => {
+            KeyProperty.createSchema(classObj);
+            classObj[KeyProperty.SCHEMA_NAME][key] =
+                KeyProperty.PRIMARY_DEFAULT;
+        };
+    }
+
     /**
      * There should be at most one unique primary key for
      * fast indexing
      */
-    Unique,
+    static unique(classObj: any) {
+        return (target: any, key: string) => {
+            KeyProperty.createSchema(classObj);
+            classObj[KeyProperty.SCHEMA_NAME][key] = KeyProperty.PRIMARY_UNIQUE;
+        };
+    }
 }
 
 export type PrimaryKey = number | boolean | string;
@@ -78,7 +100,7 @@ export type PrimaryKey = number | boolean | string;
  * Schema is a record specifying the primary keys and their respective properties
  */
 
-export type Schema<T> = { [K in keyof T]?: PrimaryKey };
+export type Schema<T> = { [K in keyof T]?: Symbol };
 export type PartialRecord<T> = { [K in keyof T]?: T[K] };
 
 export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
@@ -174,7 +196,7 @@ export class PrimaryKeyEncodig<T>
         // put the unique key up front so that we can
         // look it up more easily
         for (const key of keys) {
-            if (this.schema[key as keyof T] === PrimaryKeyProperty.Unique) {
+            if (this.schema[key as keyof T] === KeyProperty.PRIMARY_UNIQUE) {
                 assert(uniqueKey === null, "multiple unique keys");
                 uniqueKey = key;
             } else {
@@ -304,16 +326,22 @@ export class PrimaryKeyEncodig<T>
 export class Collection<T> {
     private keyEncoding: PrimaryKeyEncodig<T>;
     private uniqueKey: string | null = null;
+    private schema: Schema<T>;
 
     constructor(
         private base: KVStore<Path, JSONEncodable>,
         private path: Path,
-        private cons: ObjectConstructor<T> & ObjectWithSchema<T>
+        private cons: ObjectConstructor<T>
     ) {
-        this.keyEncoding = new PrimaryKeyEncodig(this.cons.SCHEMA);
+        this.schema =
+            KeyProperty.SCHEMA_NAME in cons
+                ? (cons as any)[KeyProperty.SCHEMA_NAME]
+                : {};
 
-        for (const key in this.cons.SCHEMA) {
-            if (this.cons.SCHEMA[key] === PrimaryKeyProperty.Unique) {
+        this.keyEncoding = new PrimaryKeyEncodig(this.schema);
+
+        for (const key in this.schema) {
+            if (this.schema[key] === KeyProperty.PRIMARY_UNIQUE) {
                 this.uniqueKey = key;
             }
         }
@@ -327,7 +355,9 @@ export class Collection<T> {
         );
     }
 
-    async add(obj: T): Promise<void> {
+    private separatePrimaryKeys(
+        obj: T
+    ): [Record<string, PrimaryKey>, Record<string, any>] {
         const primaryKeys: Record<string, PrimaryKey> = {};
         const value: Record<string, any> = {};
 
@@ -345,13 +375,18 @@ export class Collection<T> {
             }
         }
 
+        return [primaryKeys, value];
+    }
+
+    async add(obj: T): Promise<void> {
+        const [primaryKeys, value] = this.separatePrimaryKeys(obj);
         const key = this.keyEncoding.encode(primaryKeys);
 
         await this.base.set(this.path.concat(key), value);
     }
 
     isPrimaryKey(key: keyof T): boolean {
-        return this.cons.SCHEMA[key] !== undefined;
+        return this.schema[key] !== undefined;
     }
 
     /**
@@ -425,6 +460,20 @@ export class Collection<T> {
         if (rawKey === null) return null;
 
         return await this.getByRawKey(rawKey);
+    }
+
+    async setByUniqueKey<K extends keyof T>(
+        key: K,
+        value: T[K],
+        obj: T
+    ): Promise<boolean> {
+        const rawKey = await this.lookupUniqueKey(key, value);
+        if (rawKey === null) return false; // cannot find the item
+
+        const [_, data] = this.separatePrimaryKeys(obj);
+        await this.base.set(this.path.concat(rawKey), data);
+
+        return true;
     }
 
     async deleteByUniqueKey<K extends keyof T>(

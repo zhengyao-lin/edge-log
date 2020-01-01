@@ -1,20 +1,19 @@
 import { expect } from "chai";
 import {
     PartialRecord,
-    PrimaryKeyProperty,
+    KeyProperty,
     Collection,
 } from "../src/storage/container";
 import { PathJSONStore } from "../src/storage/path";
 import { MemoryStringKVStore } from "../src/storage/kv";
 
 class People {
-    static SCHEMA = {
-        id: PrimaryKeyProperty.Unique,
-        name: PrimaryKeyProperty.Default,
-    };
-
+    @KeyProperty.unique(People)
     public id: number = 0;
+
+    @KeyProperty.primary(People)
     public name: string = "";
+
     public age: number = 0;
 
     constructor(config: PartialRecord<People>) {

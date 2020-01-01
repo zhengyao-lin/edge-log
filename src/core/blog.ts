@@ -1,18 +1,13 @@
 import { PathJSONStore } from "../storage/path";
-import {
-    Collection,
-    PartialRecord,
-    PrimaryKeyProperty,
-} from "../storage/container";
+import { Collection, PartialRecord, KeyProperty } from "../storage/container";
 import { AdminConfig, Post } from "./models";
 import { uuid4 } from "../utils";
 
 export class Session {
-    static SCHEMA = {
-        id: PrimaryKeyProperty.Default,
-    };
-
+    @KeyProperty.unique(Session)
     public id: string;
+
+    @KeyProperty.primary(Session)
     private timeOfCreation: number;
 
     constructor(config: PartialRecord<Session> = {}) {
@@ -32,35 +27,28 @@ export class EdgeLog {
     static PATH_POST_COLLECTION = ["posts"];
     static PATH_SESSION_COLLECTION = ["sessions"];
 
-    private db: PathJSONStore;
+    private base: PathJSONStore;
     private adminConfig: AdminConfig;
     private postCollection: Collection<Post>;
     private sessionCollection: Collection<Session>;
 
-    constructor(db: PathJSONStore) {
-        this.db = db;
+    constructor(base: PathJSONStore) {
+        this.base = base;
 
-        this.adminConfig = new AdminConfig(db, EdgeLog.PATH_ADMIN_CONFIG);
+        this.adminConfig = new AdminConfig(base, EdgeLog.PATH_ADMIN_CONFIG);
+
         this.postCollection = new Collection(
-            db,
+            base,
             EdgeLog.PATH_POST_COLLECTION,
             Post
         );
+
         this.sessionCollection = new Collection(
-            db,
+            base,
             EdgeLog.PATH_SESSION_COLLECTION,
             Session
         );
     }
-
-    /**
-     * Interfaces
-     * 1. login related
-     *   - check password/login
-     *   - session/authorization management
-     * 2. posts
-     *   - create/edit posts
-     */
 
     /**
      * Checks the given passcode and returns a new session if it's correct
@@ -76,40 +64,19 @@ export class EdgeLog {
         return null;
     }
 
-    // async getSession(sessionID: string): Promise<Session | null> {
-    //     return await this.sessionCollection.get(sessionID);
-    // }
+    async checkSession(id: string): Promise<Session | null> {
+        return await this.sessionCollection.getByUniqueKey("id", id);
+    }
 
-    // /**
-    //  * Sort post ids by creation time
-    //  */
-    // async getSortedPostIDs(): Promise<string[]> {
-    //     const ids = await this.postCollection.list();
+    async addPost(post: Post): Promise<void> {
+        await this.postCollection.add(post);
+    }
 
-    //     ids.sort((a, b) => {
-    //         const [t1] = a.split("-");
-    //         const [t2] = b.split("-");
-    //         return parseInt(t2) - parseInt(t1);
-    //     });
+    async editPost(post: Post): Promise<void> {
+        await this.postCollection.setByUniqueKey("id", post.id, post);
+    }
 
-    //     return ids;
-    // }
-
-    // async getPosts(ids: string[]): Promise<Post[]> {
-    //     const posts: Post[] = [];
-
-    //     for (const id of ids) {
-    //         const post = await this.postCollection.get(id);
-
-    //         if (post != null) {
-    //             posts.push();
-    //         }
-    //     }
-
-    //     return posts;
-    // }
-
-    // async createPost(post: Post): Promise<void> {
-    //     await this.postCollection.set(post.id, post);
-    // }
+    async getPost(id: string): Promise<Post | null> {
+        return await this.postCollection.getByUniqueKey("id", id);
+    }
 }

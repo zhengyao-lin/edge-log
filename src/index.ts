@@ -2,60 +2,63 @@ import { PathJSONStore } from "./storage/path";
 import { EdgeLog } from "./core/blog";
 
 import { WorkerStringKVStore } from "./worker";
+import { Application, ResponseObject, ParsedRequest } from "./application";
 
 const kv = new WorkerStringKVStore(TEST_KV);
 const db = new PathJSONStore(kv);
 const blog = new EdgeLog(db);
 
-addEventListener("fetch", event => {
-    event.respondWith(handleRequest(event.request));
-});
+class MainApplication extends Application {
+    @Application.get("/login")
+    async handleLogin(request: ParsedRequest): Promise<ResponseObject> {
+        const passcode = request.url.searchParams.get("passcode");
 
-async function handleRequest(request: Request) {
-    const url = new URL(request.url);
-    let response;
+        if (passcode === null) {
+            // check for cookie
+            const cookie = request.headers.get("cookie");
 
-    /**
-     * POST /api/login
-     *   - passcode: string
-     *
-     * POST /api/post
-     *   - title: string
-     *   - content: string
-     *
-     * PUT /api/post
-     *   - id: string
-     *   - title: string
-     *   - content: string
-     *
-     * GET /api/post
-     *   - id: string
-     */
-
-    switch (url.pathname) {
-        case "/login": {
-            const passcode = url.searchParams.get("passcode");
-
-            if (passcode === null) {
-                response = "400 bad request";
+            if (cookie === null) {
+                return { text: "400 bad request", status: 400 };
             } else {
-                const session = await blog.login(passcode);
+                const match = /session-id=([a-fA-F0-9-]+)/.exec(cookie);
 
-                if (session === null) {
-                    response = "wrong passcode";
+                if (match === null) {
+                    return { text: "400 bad request", status: 400 };
                 } else {
-                    response = "session: " + session.id;
+                    const id = match[1];
+                    const session = await blog.checkSession(id);
+
+                    if (session === null) {
+                        return {
+                            text: `illegal session id ${id}`,
+                            status: 400,
+                        };
+                    } else {
+                        return {
+                            text: `found session id ${id}; first login ${session.getTimeOfCreation()}`,
+                        };
+                    }
                 }
             }
+        } else {
+            const session = await blog.login(passcode);
 
-            break;
+            if (session === null) {
+                return { text: "wrong passcode", status: 400 };
+            } else {
+                return {
+                    text: `session: ${session.id}`,
+                    headers: {
+                        setCookie: `session-id=${session.id}`,
+                    },
+                };
+            }
         }
-
-        default:
-            response = "404 not found";
     }
-
-    return new Response(response, {
-        headers: { "content-type": "text/plain" },
-    });
 }
+
+const app = new MainApplication();
+
+addEventListener("fetch", event => {
+    event.respondWith(app.handleRequest(event.request));
+});
