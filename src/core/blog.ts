@@ -1,11 +1,15 @@
 import { PathJSONStore } from "../storage/path";
-import { Collection, PartialRecord, PrimaryKey } from "../storage/container";
+import {
+    Collection,
+    PartialRecord,
+    PrimaryKeyProperty,
+} from "../storage/container";
 import { AdminConfig, Post } from "./models";
 import { uuid4 } from "../utils";
 
 export class Session {
     static SCHEMA = {
-        id: PrimaryKey.Default
+        id: PrimaryKeyProperty.Default,
     };
 
     public id: string;

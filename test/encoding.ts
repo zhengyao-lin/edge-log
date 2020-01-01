@@ -1,11 +1,15 @@
 import { expect } from "chai";
 
-import { Path, PathJSONStore, SeparatorPathScheme } from "../src/storage/path";
+import {
+    Path,
+    PathJSONStore,
+    SeparatorPathEncoding,
+} from "../src/storage/path";
 import { MemoryStringKVStore } from "../src/storage/kv";
 
 describe("separator path scheme", () => {
     it("is bijective", () => {
-        const pathScheme = new SeparatorPathScheme();
+        const pathScheme = new SeparatorPathEncoding();
         const cases: [Path, string][] = [
             [["1\x002"], "1\x01\x022"],
             [["1", "2"], "1\x002"],
@@ -32,6 +36,8 @@ describe("PathJSONStore basics", () => {
             b: 3,
         });
         expect(await store.get(["this", "is", "eee"])).equals(null);
-        expect(await store.list(["this", "is", "a"])).eql([["this", "is", "a", "path"]]);
+        expect(await store.list(["this", "is", "a"])).eql([
+            ["this", "is", "a", "path"],
+        ]);
     });
 });

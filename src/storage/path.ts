@@ -1,114 +1,42 @@
 import { KVStore } from "./kv";
 import { assert } from "../utils";
+import { Encoding, BaseReductionEncoding } from "./encoding";
 
 export type Path = string[];
 export type JSONEncodable = any;
 
-export interface PathScheme {
-    /**
-     * encode/decode must be bijective
-     * and have the property that
-     * for all a: string, b: string, path: Path,
-     * a is a prefix of b => encode(path + [a]) is a prefix of encode(path + [b])
-     */
-    encode(path: Path): string;
-    decode(key: string): Path;
-}
+/**
+ * PathEncoding is an encoding with the additional property that
+ * for all a: string, b: string, path: Path,
+ * a is a prefix of b => encode(path + [a]) is a prefix of encode(path + [b])
+ */
+export type PathEncoding = Encoding<Path, string>;
 
-export class URIPathScheme implements PathScheme {
+export class URIPathEncoding implements PathEncoding {
     constructor() {}
 
     encode(path: Path): string {
         return path.map(encodeURIComponent).join("/");
     }
 
-    decode(key: string): Path {
+    decode(key: string): Path | null {
         return key.split("/").map(decodeURIComponent);
     }
 }
 
-export class SeparatorPathScheme implements PathScheme {
-    private escapeChars: number[];
+export class SeparatorPathEncoding implements PathEncoding {
+    private base: BaseReductionEncoding;
 
-    constructor(private separator: number = 0) {
-        this.separator = this.separator % 256;
-        this.escapeChars = [(separator + 1) % 256, (separator + 2) % 256];
+    constructor(private separator: string = "\0") {
+        this.base = new BaseReductionEncoding(separator);
     }
 
     encode(path: Path): string {
-        return path
-            .map(this.escapePathComponent.bind(this))
-            .join(String.fromCharCode(this.separator));
+        return path.map(this.base.encode.bind(this.base)).join(this.separator);
     }
 
-    decode(key: string): Path {
-        return key
-            .split(String.fromCharCode(this.separator))
-            .map(this.unescapePathComponent.bind(this));
-    }
-
-    private escapePathComponent(str: string): string {
-        // suppose t is the separator code
-        // let a, b be two arbitrary characters where a /= t and b /= t
-        // then the following character transformation is a bijection
-        // a -> aa
-        // b -> bb
-        // t -> ab
-        // _ -> _
-
-        const t = this.separator;
-        const [a, b] = this.escapeChars;
-
-        let charA = a.toString(16),
-            charB = b.toString(16),
-            charT = t.toString(16);
-
-        if (charA.length == 1) charA = "0" + charA;
-        if (charB.length == 1) charB = "0" + charB;
-        if (charT.length == 1) charT = "0" + charT;
-
-        const regex = RegExp(`[\\x${charA}\\x${charB}\\x${charT}]`, "g");
-
-        return str.replace(regex, substr => {
-            const code = substr.charCodeAt(0);
-
-            if (code == a) {
-                return String.fromCharCode(a, a);
-            } else if (code == b) {
-                return String.fromCharCode(b, b);
-            } else {
-                return String.fromCharCode(a, b);
-            }
-        });
-    }
-
-    /**
-     * inverse of escapePathComponent
-     */
-    private unescapePathComponent(str: string): string {
-        const [a, b] = this.escapeChars;
-
-        let charA = a.toString(16),
-            charB = b.toString(16);
-
-        if (charA.length == 1) charA = "0" + charA;
-        if (charB.length == 1) charB = "0" + charB;
-
-        const regex = RegExp(
-            `\\x${charA}\\x${charA}|\\x${charA}\\x${charB}|\\x${charB}\\x${charB}`,
-            "g"
-        );
-
-        return str.replace(regex, substr => {
-            if (substr == String.fromCharCode(a, a)) {
-                return String.fromCharCode(a);
-            } else if (substr == String.fromCharCode(b, b)) {
-                return String.fromCharCode(b);
-            } else {
-                // a b
-                return String.fromCharCode(this.separator);
-            }
-        });
+    decode(key: string): Path | null {
+        return key.split(this.separator).map(this.base.decode.bind(this.base));
     }
 }
 
@@ -118,13 +46,13 @@ export class SeparatorPathScheme implements PathScheme {
 export class PathJSONStore extends KVStore<Path, JSONEncodable> {
     constructor(
         private base: KVStore<string, string>,
-        private pathScheme: PathScheme = new URIPathScheme()
+        private pathEncoding: PathEncoding = new URIPathEncoding()
     ) {
         super();
     }
 
     async get(path: Path): Promise<JSONEncodable | null> {
-        const stringValue = await this.base.get(this.pathScheme.encode(path));
+        const stringValue = await this.base.get(this.pathEncoding.encode(path));
 
         if (stringValue === null) {
             return null;
@@ -140,21 +68,30 @@ export class PathJSONStore extends KVStore<Path, JSONEncodable> {
 
     async set(path: Path, obj: JSONEncodable): Promise<void> {
         await this.base.set(
-            this.pathScheme.encode(path),
+            this.pathEncoding.encode(path),
             JSON.stringify(obj)
         );
     }
 
     async delete(path: Path): Promise<void> {
-        await this.base.delete(this.pathScheme.encode(path));
+        await this.base.delete(this.pathEncoding.encode(path));
     }
 
     /**
      * return keys of kv pairs under a path (only the last path component is returned)
      */
     async list(prefix: Path): Promise<Path[]> {
-        const keys = await this.base.list(this.pathScheme.encode(prefix));
+        const keys = await this.base.list(this.pathEncoding.encode(prefix));
+        const paths: Path[] = [];
 
-        return keys.map(this.pathScheme.decode.bind(this.pathScheme));
+        for (const key of keys) {
+            const path = this.pathEncoding.decode(key);
+
+            if (path !== null) {
+                paths.push(path);
+            }
+        }
+
+        return paths;
     }
 }

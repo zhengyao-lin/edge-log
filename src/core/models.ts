@@ -1,4 +1,8 @@
-import { Configuration, PartialRecord, PrimaryKey } from "../storage/container";
+import {
+    Configuration,
+    PartialRecord,
+    PrimaryKeyProperty,
+} from "../storage/container";
 import BLAKE2s from "blake2s-js";
 import { uuid4 } from "../utils";
 
@@ -60,10 +64,10 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
  */
 export class Post {
     static SCHEMA = {
-        id:             PrimaryKey.ReadOnly,
-        title:          PrimaryKey.Default,
-        timeOfCreation: PrimaryKey.ReadOnly,
-        timeOfLastEdit: PrimaryKey.Default
+        id: PrimaryKeyProperty.Unique,
+        title: PrimaryKeyProperty.Default,
+        timeOfCreation: PrimaryKeyProperty.Default,
+        timeOfLastEdit: PrimaryKeyProperty.Default,
     };
 
     public id: string;

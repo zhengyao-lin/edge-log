@@ -1,6 +1,7 @@
 import { Path, JSONEncodable } from "./path";
 import { KVStore } from "./kv";
 import { assert } from "../utils";
+import { Encoding, BaseReductionEncoding } from "./encoding";
 
 /**
  * Containers built on a path-JSON store
@@ -13,8 +14,10 @@ import { assert } from "../utils";
 export abstract class Configuration<T> {
     private config: T | null = null;
 
-    constructor(private base: KVStore<Path, JSONEncodable>,
-                private path: Path) {}
+    constructor(
+        private base: KVStore<Path, JSONEncodable>,
+        private path: Path
+    ) {}
 
     protected abstract default(): T;
 
@@ -52,69 +55,502 @@ export abstract class Configuration<T> {
     }
 }
 
-export enum PrimaryKey {
+/**
+ * Primary keys are a set of keys in a record
+ * used for indexing and searching
+ *
+ * Only integer, boolean, and string are allowed to be used as primary keys
+ *
+ * Primary keys are readonly
+ */
+export enum PrimaryKeyProperty {
     Default,
-    ReadOnly
-};
+    /**
+     * There should be at most one unique primary key for
+     * fast indexing
+     */
+    Unique,
+}
+
+export type PrimaryKey = number | boolean | string;
 
 /**
  * Schema is a record specifying the primary keys and their respective properties
  */
-export type Schema<T> = { [K in keyof T]?: PrimaryKey };
 
-export type PartialRecord<T> = { [P in keyof T]?: T[P] };
+export type Schema<T> = { [K in keyof T]?: PrimaryKey };
+export type PartialRecord<T> = { [K in keyof T]?: T[K] };
+
 export type ObjectConstructor<T> = new (c: PartialRecord<T>) => T;
 export type ObjectWithSchema<T> = { SCHEMA: Schema<T> };
 
 /**
+ * Patterns and queries
+ */
+
+export type StringPattern = string | RegExp;
+export type NumberPattern =
+    | number
+    | { gt: number }
+    | { lt: number }
+    | { ge: number }
+    | { le: number };
+
+export type PrimitivePattern<V> = V extends string
+    ? StringPattern
+    : V extends number
+    ? NumberPattern
+    : V;
+
+export type ObjectPattern<T> = { [K in keyof T]?: PrimitivePattern<T[K]> };
+
+/**
+ * Disjunction of all patterns
+ */
+export type Query<T> = ObjectPattern<T>[];
+
+/**
+ * Lazy loader of items
+ */
+export class Cursor<T> {
+    private cache: (T | null)[];
+
+    constructor(private collection: Collection<T>, private rawKeys: string[]) {
+        this.cache = [];
+    }
+
+    [Symbol.asyncIterator](): AsyncIterator<T | null> {
+        let position = 0;
+
+        return {
+            next: async (): Promise<IteratorResult<T | null>> => {
+                if (position >= this.rawKeys.length) {
+                    return { done: true, value: null };
+                }
+
+                if (this.cache[position] === undefined) {
+                    const rawKey = this.rawKeys[position];
+                    this.cache[position] = await this.collection.getByRawKey(
+                        rawKey
+                    );
+                }
+
+                return {
+                    done: false,
+                    value: this.cache[position++],
+                };
+            },
+        };
+    }
+
+    async readAll(): Promise<(T | null)[]> {
+        const items: (T | null)[] = [];
+
+        for await (const item of this) {
+            items.push(item);
+        }
+
+        return items;
+    }
+}
+
+export class PrimaryKeyEncodig<T>
+    implements Encoding<Record<string, PrimaryKey>, string> {
+    private keyToIndex: Record<string, number>;
+    private indexToKey: string[];
+
+    constructor(
+        private schema: Schema<T>,
+        private separator: string = "|",
+        private componentEncoding: Encoding<
+            string,
+            string
+        > = new BaseReductionEncoding("|")
+    ) {
+        let keys = Object.keys(schema);
+        let uniqueKey = null;
+        const defaultKeys = [];
+
+        // put the unique key up front so that we can
+        // look it up more easily
+        for (const key of keys) {
+            if (this.schema[key as keyof T] === PrimaryKeyProperty.Unique) {
+                assert(uniqueKey === null, "multiple unique keys");
+                uniqueKey = key;
+            } else {
+                defaultKeys.push(key);
+            }
+        }
+
+        defaultKeys.sort((a, b) => a.localeCompare(b));
+
+        if (uniqueKey !== null) {
+            keys = [uniqueKey].concat(defaultKeys);
+        } else {
+            keys = defaultKeys;
+        }
+
+        this.keyToIndex = {};
+        this.indexToKey = keys;
+
+        keys.forEach((key, index) => {
+            this.keyToIndex[key] = index;
+        });
+    }
+
+    private encodeComponent(value: PrimaryKey): string {
+        if (typeof value === "number") return "i" + value.toString(16);
+        if (typeof value === "boolean") return value ? "b1" : "b0";
+
+        // just string
+        return "s" + value;
+    }
+
+    private decodeComponent(encoded: string): PrimaryKey | null {
+        if (encoded.length == 0) return null;
+
+        const typeToken = encoded[0];
+        encoded = encoded.substr(1);
+
+        if (typeToken === "i") {
+            const value = Number.parseInt(encoded, 16);
+
+            if (Number.isNaN(value)) return null;
+
+            return value;
+        }
+
+        if (typeToken === "b") {
+            if (encoded === "0") return false;
+            if (encoded === "1") return true;
+            return null;
+        }
+
+        if (typeToken === "s") {
+            return encoded;
+        }
+
+        return null;
+    }
+
+    /**
+     * Given the unique key, returns a (unique) prefix
+     * for any potential encoding
+     */
+    encodeUniqueKeyPrefix(value: PrimaryKey): string {
+        return this.encodeComponent(value) + this.separator;
+    }
+
+    encode(primaryKeys: Record<string, PrimaryKey>): string {
+        const keys = [];
+
+        for (const key in primaryKeys) {
+            const value = primaryKeys[key];
+            const index = this.keyToIndex[key];
+
+            assert(
+                index != undefined,
+                `"${key}" is not supposed to be a primary key`
+            );
+
+            keys[index] = this.componentEncoding.encode(
+                this.encodeComponent(value)
+            );
+        }
+
+        return keys.join(this.separator);
+    }
+
+    decode(encoded: string): Record<string, PrimaryKey> | null {
+        const keys = encoded.split(this.separator);
+        const primaryKeys: Record<string, PrimaryKey> = {};
+
+        if (keys.length != this.indexToKey.length) {
+            return null;
+        }
+
+        let failed = false;
+
+        keys.forEach((encoded, index) => {
+            const component = this.componentEncoding.decode(encoded);
+
+            if (component === null) {
+                failed = true;
+                return;
+            }
+
+            const value = this.decodeComponent(component);
+
+            if (value === null) {
+                failed = true;
+                return;
+            }
+
+            primaryKeys[this.indexToKey[index]] = value;
+        });
+
+        if (failed) return null;
+
+        return primaryKeys;
+    }
+}
+
+/**
  * A collection is a set of objects indexed by a specified set of
  * primary keys in the object
- * 
+ *
  * Objects can be queried and sorted by one or more of the primary keys
  */
 export class Collection<T> {
+    private keyEncoding: PrimaryKeyEncodig<T>;
+    private uniqueKey: string | null = null;
+
     constructor(
         private base: KVStore<Path, JSONEncodable>,
         private path: Path,
         private cons: ObjectConstructor<T> & ObjectWithSchema<T>
-    ) {}
+    ) {
+        this.keyEncoding = new PrimaryKeyEncodig(this.cons.SCHEMA);
+
+        for (const key in this.cons.SCHEMA) {
+            if (this.cons.SCHEMA[key] === PrimaryKeyProperty.Unique) {
+                this.uniqueKey = key;
+            }
+        }
+    }
+
+    static isValidPrimaryKey(v: any): v is PrimaryKey {
+        return (
+            (typeof v === "number" && Number.isInteger(v)) ||
+            typeof v === "boolean" ||
+            typeof v === "string"
+        );
+    }
 
     async add(obj: T): Promise<void> {
-        const primaryKeys: Record<string, any> = {};
+        const primaryKeys: Record<string, PrimaryKey> = {};
         const value: Record<string, any> = {};
 
         for (const key in obj) {
             if (this.isPrimaryKey(key)) {
-                primaryKeys[key.toString()] = obj[key];
+                const v = obj[key]; // add a temporary value to make type checker happy
+
+                if (Collection.isValidPrimaryKey(v)) {
+                    primaryKeys[key.toString()] = v;
+                } else {
+                    assert(false, `value "${v}" is not a valid primary key`);
+                }
             } else {
                 value[key.toString()] = obj[key];
             }
         }
 
-        const key = JSON.stringify(primaryKeys);
-        
-        await this.base.set(this.path.concat([key]), value);
+        const key = this.keyEncoding.encode(primaryKeys);
+
+        await this.base.set(this.path.concat(key), value);
     }
 
     isPrimaryKey(key: keyof T): boolean {
         return this.cons.SCHEMA[key] !== undefined;
     }
 
-    async getAllPrimaryKeys(): Promise<Schema<T>[]> {
-        const paths = (await this.base.list(this.path))
-            .filter(path => path.length == this.path.length + 1);
+    /**
+     * List keys immediately under the base path with the given prefix
+     */
+    private async listImmediatePrefix(prefix: string): Promise<string[]> {
+        return (await this.base.list(this.path.concat(prefix)))
+            .filter(path => path.length == this.path.length + 1)
+            .map(path => path[path.length - 1]);
+    }
 
-        const keys: Schema<T>[] = [];
+    async getAllPrimaryKeys(): Promise<Record<string, PrimaryKey>[]> {
+        const rawKeys = await this.listImmediatePrefix("");
+        const keys: Record<string, PrimaryKey>[] = [];
 
-        for (const path of paths) {
-            try {
-                keys.push(JSON.parse(path[path.length - 1]));
-            } catch (_) { } // ignore if decoding failed
+        for (const rawKey of rawKeys) {
+            const primaryKeys = this.keyEncoding.decode(rawKey);
+
+            if (primaryKeys !== null) {
+                keys.push(primaryKeys);
+            }
         }
 
         return keys;
     }
 
-    // query
-    // mutation
+    /**
+     * Look up the raw key corresponding to the given key-value pair
+     */
+    private async lookupUniqueKey<K extends keyof T>(
+        key: K,
+        value: T[K]
+    ): Promise<string | null> {
+        assert(
+            this.uniqueKey !== null && this.uniqueKey === key,
+            `"${key}" is not a unique key`
+        );
+
+        if (!Collection.isValidPrimaryKey(value)) {
+            assert(false, `${value} is not a valid primary key value`);
+            return null;
+        }
+
+        const prefix = this.keyEncoding.encodeUniqueKeyPrefix(value);
+        const rawKeys = await this.listImmediatePrefix(prefix);
+
+        // take the first one if there are multiple key
+        if (rawKeys.length == 0) return null;
+        return rawKeys[0];
+    }
+
+    async getByRawKey(rawKey: string): Promise<T | null> {
+        const primaryKeys = this.keyEncoding.decode(rawKey);
+
+        const dataKeys = await this.base.get(this.path.concat(rawKey));
+        if (dataKeys === null) return null;
+
+        const partial: PartialRecord<T> = {
+            ...primaryKeys,
+            ...dataKeys,
+        };
+
+        return new this.cons(partial);
+    }
+
+    async getByUniqueKey<K extends keyof T>(
+        key: K,
+        value: T[K]
+    ): Promise<T | null> {
+        const rawKey = await this.lookupUniqueKey(key, value);
+        if (rawKey === null) return null;
+
+        return await this.getByRawKey(rawKey);
+    }
+
+    async deleteByUniqueKey<K extends keyof T>(
+        key: K,
+        value: T[K]
+    ): Promise<boolean> {
+        const rawKey = await this.lookupUniqueKey(key, value);
+
+        if (rawKey !== null) {
+            await this.base.delete(this.path.concat(rawKey));
+            return true;
+        }
+
+        return false;
+    }
+
+    private matchPattern(
+        primaryKeys: Record<string, PrimaryKey>,
+        pattern: ObjectPattern<T>
+    ): boolean {
+        for (const key in pattern) {
+            if (!primaryKeys.hasOwnProperty(key)) {
+                return false;
+            }
+
+            const value = primaryKeys[key];
+            const subpattern: any = pattern[key];
+
+            switch (typeof value) {
+                /**
+                 * integer patterns
+                 */
+                case "number":
+                    if (typeof subpattern === "number") {
+                        if (subpattern !== value) {
+                            return false;
+                        }
+                    } else {
+                        if (
+                            subpattern["gt"] !== undefined &&
+                            !(value > subpattern["gt"])
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            subpattern["lt"] !== undefined &&
+                            !(value < subpattern["lt"])
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            subpattern["ge"] !== undefined &&
+                            !(value >= subpattern["ge"])
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            subpattern["le"] !== undefined &&
+                            !(value <= subpattern["le"])
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    break;
+
+                /**
+                 * boolean patterns
+                 */
+                case "boolean":
+                    if (value !== subpattern) {
+                        return false;
+                    }
+
+                    break;
+
+                /**
+                 * string patterns
+                 */
+                case "string":
+                    if (subpattern instanceof RegExp) {
+                        if (!subpattern.test(value)) {
+                            return false;
+                        }
+                    } else if (value !== subpattern) {
+                        return false;
+                    }
+
+                    break;
+            }
+        }
+
+        return true;
+    }
+
+    private matchQuery(
+        primaryKeys: Record<string, PrimaryKey>,
+        query: Query<T>
+    ): boolean {
+        for (const pattern of query) {
+            if (this.matchPattern(primaryKeys, pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Given a query in disjunctive form, returns
+     * the list of items satisfying at least one of the
+     * conditions
+     */
+    async query(query: Query<T>): Promise<Cursor<T>> {
+        const primaryKeysSet = await this.getAllPrimaryKeys();
+        const rawKeys: string[] = [];
+
+        for (const primaryKeys of primaryKeysSet) {
+            if (this.matchQuery(primaryKeys, query)) {
+                rawKeys.push(this.keyEncoding.encode(primaryKeys));
+            }
+        }
+
+        return new Cursor(this, rawKeys);
+    }
 }
