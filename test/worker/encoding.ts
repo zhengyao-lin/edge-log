@@ -4,9 +4,9 @@ import {
     Path,
     PathJSONStore,
     SeparatorPathEncoding,
-} from "../src/storage/path";
-import { MemoryStringKVStore } from "../src/storage/kv";
-import { CookieJar } from "../src/application";
+} from "../../src/worker/storage/path";
+import { MemoryStringKVStore } from "../../src/worker/storage/kv";
+import { CookieJar } from "../../src/worker/application";
 
 describe("separator path scheme", () => {
     it("is bijective", () => {

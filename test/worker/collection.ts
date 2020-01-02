@@ -1,10 +1,7 @@
 import { expect } from "chai";
-import {
-    KeyProperty,
-    Collection,
-} from "../src/storage/container";
-import { PathJSONStore } from "../src/storage/path";
-import { MemoryStringKVStore } from "../src/storage/kv";
+import { KeyProperty, Collection } from "../../src/worker/storage/container";
+import { PathJSONStore } from "../../src/worker/storage/path";
+import { MemoryStringKVStore } from "../../src/worker/storage/kv";
 
 class People {
     @KeyProperty.unique(People)

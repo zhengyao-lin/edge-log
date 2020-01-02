@@ -1,7 +1,4 @@
-import {
-    Configuration,
-    KeyProperty,
-} from "../storage/container";
+import { Configuration, KeyProperty } from "../storage/container";
 import BLAKE2s from "blake2s-js";
 import { uuid4 } from "../utils";
 

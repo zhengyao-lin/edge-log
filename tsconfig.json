@@ -1,15 +1,17 @@
 {
     "compilerOptions": {
-        "target": "esnext",
-        "lib": ["esnext", "webworker"],
+        "target": "es6",
+        "lib": ["es6", "webworker", "dom"],
         "alwaysStrict": true,
         "strict": true,
         "preserveConstEnums": true,
         "moduleResolution": "node",
         "inlineSourceMap": true,
         "esModuleInterop": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "skipLibCheck": true,
+        "jsx": "preserve"
     },
-    "include": ["src/**/*.ts", "test/**/*.ts"],
+    "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"],
     "exclude": ["node_modules/", "dist/"]
 }

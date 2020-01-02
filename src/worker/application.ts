@@ -119,24 +119,25 @@ export abstract class Application {
 
         return new Response(response, {
             status,
-            headers: encodedHeaders
+            headers: encodedHeaders,
         });
     }
 }
 
 export class CookieJar {
     [x: string]: string;
-    
+
     constructor(cookie: string) {
         /**
          * https://gist.github.com/rendro/525bbbf85e84fa9042c2#gistcomment-2784930
          */
-        cookie
-            .split(";")
-            .reduce((res, c) => {
-                const [key, val] = c.trim().split("=").map(decodeURIComponent)
-                return Object.assign(res, { [key]: val });
-            }, this);
+        cookie.split(";").reduce((res, c) => {
+            const [key, val] = c
+                .trim()
+                .split("=")
+                .map(decodeURIComponent);
+            return Object.assign(res, { [key]: val });
+        }, this);
     }
 }
 
@@ -145,7 +146,9 @@ CookieJar.prototype.toString = function(): string {
 
     for (const key in this) {
         if ((this as Object).hasOwnProperty(key)) {
-            pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(this[key])}`);
+            pairs.push(
+                `${encodeURIComponent(key)}=${encodeURIComponent(this[key])}`
+            );
         }
     }
 
