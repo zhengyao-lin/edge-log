@@ -1,7 +1,10 @@
-import { PathJSONStore } from "../storage/path";
-import { Collection, KeyProperty } from "../storage/container";
+import { Path } from "../storage/path";
+import { Collection, KeyProperty } from "../storage/containers/collection";
 import { AdminConfig, Post } from "./models";
 import { uuid4 } from "../utils";
+import { KVStore } from "../storage/kv";
+import { JSONEncodable } from "../storage/encoding";
+import { Directory } from "../storage/containers/directory";
 
 export class Session {
     @KeyProperty.unique(Session)
@@ -27,25 +30,22 @@ export class EdgeLog {
     static PATH_POST_COLLECTION = ["posts"];
     static PATH_SESSION_COLLECTION = ["sessions"];
 
-    private base: PathJSONStore;
     private adminConfig: AdminConfig;
     private postCollection: Collection<Post>;
     private sessionCollection: Collection<Session>;
 
-    constructor(base: PathJSONStore) {
+    constructor(private base: Directory<JSONEncodable>) {
         this.base = base;
 
-        this.adminConfig = new AdminConfig(base, EdgeLog.PATH_ADMIN_CONFIG);
+        this.adminConfig = new AdminConfig(base.enter(EdgeLog.PATH_ADMIN_CONFIG));
 
         this.postCollection = new Collection(
-            base,
-            EdgeLog.PATH_POST_COLLECTION,
+            base.enter(EdgeLog.PATH_POST_COLLECTION),
             Post
         );
 
         this.sessionCollection = new Collection(
-            base,
-            EdgeLog.PATH_SESSION_COLLECTION,
+            base.enter(EdgeLog.PATH_SESSION_COLLECTION),
             Session
         );
     }

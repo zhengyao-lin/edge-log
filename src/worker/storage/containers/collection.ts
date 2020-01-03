@@ -1,59 +1,6 @@
-import { Path } from "./path";
-import { KVStore } from "./kv";
-import { assert } from "../utils";
-import { Encoding, BaseReductionEncoding, JSONEncodable } from "./encoding";
-
-/**
- * Containers built on a path-JSON store
- */
-
-/**
- * Configuration is a cached single object
- * that can be used to access individual fields
- */
-export abstract class Configuration<T extends JSONEncodable> {
-    private config: T | null = null;
-
-    constructor(
-        private base: KVStore<Path, JSONEncodable>,
-        private path: Path
-    ) {}
-
-    protected abstract default(): T;
-
-    async set<K extends keyof T>(key: K, value: T[K]) {
-        await this.fetch();
-        (this.config as T)[key] = value;
-        await this.sync();
-    }
-
-    async get<K extends keyof T>(key: K): Promise<T[K]> {
-        await this.fetch();
-        return (this.config as T)[key];
-    }
-
-    /**
-     * Syncrhonize changes
-     */
-    private async sync() {
-        if (this.config !== null) {
-            await this.base.set(this.path, this.config);
-        } // if the config is null, we must have not changed it
-    }
-
-    private async fetch() {
-        if (this.config === null) {
-            this.config = this.default();
-
-            const upstream = await this.base.get(this.path);
-
-            // upstream config exists
-            if (upstream !== null) {
-                Object.assign(this.config, upstream);
-            }
-        }
-    }
-}
+import { assert } from "../../utils";
+import { Encoding, BaseReductionEncoding, JSONEncodable } from "../encoding";
+import { Directory } from "./directory";
 
 /**
  * Primary keys are a set of keys in a record
@@ -62,6 +9,8 @@ export abstract class Configuration<T extends JSONEncodable> {
  * Only integer, boolean, and string are allowed to be used as primary keys
  *
  * Primary keys are readonly
+ *
+ * Requires a path-JSON store
  */
 export class KeyProperty {
     static readonly SCHEMA_NAME: unique symbol = Symbol();
@@ -328,8 +277,7 @@ export class Collection<T> {
     private schema: Schema<T>;
 
     constructor(
-        private base: KVStore<Path, JSONEncodable>,
-        private path: Path,
+        private base: Directory<JSONEncodable>,
         private cons: ObjectConstructor<T>
     ) {
         this.schema =
@@ -382,7 +330,7 @@ export class Collection<T> {
         const [primaryKeys, value] = this.separatePrimaryKeys(obj);
         const key = this.keyEncoding.encode(primaryKeys);
 
-        await this.base.set(this.path.concat(key), value);
+        await this.base.set([key], value);
     }
 
     isPrimaryKey(key: keyof T): boolean {
@@ -392,14 +340,14 @@ export class Collection<T> {
     /**
      * List keys immediately under the base path with the given prefix
      */
-    private async listImmediatePrefix(prefix: string): Promise<string[]> {
-        return (await this.base.list(this.path.concat(prefix)))
-            .filter(path => path.length == this.path.length + 1)
-            .map(path => path[path.length - 1]);
+    private async listImmediateWeakPrefix(prefix: string): Promise<string[]> {
+        return (await this.base.listWeakPrefix([prefix]))
+            .filter(path => path.length == 1)
+            .map(path => path[0]);
     }
 
     async getAllPrimaryKeys(): Promise<Record<string, PrimaryKey>[]> {
-        const rawKeys = await this.listImmediatePrefix("");
+        const rawKeys = await this.listImmediateWeakPrefix("");
         const keys: Record<string, PrimaryKey>[] = [];
 
         for (const rawKey of rawKeys) {
@@ -431,7 +379,7 @@ export class Collection<T> {
         );
 
         const prefix = this.keyEncoding.encodeUniqueKeyPrefix(value);
-        const rawKeys = await this.listImmediatePrefix(prefix);
+        const rawKeys = await this.listImmediateWeakPrefix(prefix);
 
         // take the first one if there are multiple key
         if (rawKeys.length == 0) return null;
@@ -441,7 +389,7 @@ export class Collection<T> {
     async getByRawKey(rawKey: string): Promise<T | null> {
         const primaryKeys = this.keyEncoding.decode(rawKey);
 
-        const dataKeys = await this.base.get(this.path.concat(rawKey));
+        const dataKeys = await this.base.get([rawKey]);
         if (dataKeys === null) return null;
 
         const partial: Partial<T> = {
@@ -471,7 +419,7 @@ export class Collection<T> {
         if (rawKey === null) return false; // cannot find the item
 
         const [_, data] = this.separatePrimaryKeys(obj);
-        await this.base.set(this.path.concat(rawKey), data);
+        await this.base.set([rawKey], data);
 
         return true;
     }
@@ -483,7 +431,7 @@ export class Collection<T> {
         const rawKey = await this.lookupUniqueKey(key, value);
 
         if (rawKey !== null) {
-            await this.base.delete(this.path.concat(rawKey));
+            await this.base.delete([rawKey]);
             return true;
         }
 

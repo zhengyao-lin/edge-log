@@ -1,5 +1,19 @@
 import { expect } from "chai";
-import { MemoryStringKVStore, KVStore } from "../../src/worker/storage/kv";
+import {
+    MemoryStringKVStore,
+    KVStore,
+    EncodedStore,
+} from "../../src/worker/storage/kv";
+import { JSONEncodable, JSONEncoding } from "../../src/worker/storage/encoding";
+import { Path, URIPathEncoding } from "../../src/worker/storage/path";
+
+export function newPathJSONStore(): KVStore<Path, JSONEncodable> {
+    return new EncodedStore(
+        new MemoryStringKVStore(),
+        new URIPathEncoding(),
+        new JSONEncoding()
+    );
+}
 
 describe("kv basics", () => {
     it("get/set values correctly", async () => {

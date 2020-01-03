@@ -1,7 +1,10 @@
 import { expect } from "chai";
-import { KeyProperty, Collection } from "../../src/worker/storage/container";
-import { PathJSONStore } from "../../src/worker/storage/path";
-import { MemoryStringKVStore } from "../../src/worker/storage/kv";
+import {
+    KeyProperty,
+    Collection,
+} from "../../src/worker/storage/containers/collection";
+import { newPathJSONStore } from "./kv";
+import { Directory } from "../../src/worker/storage/containers/directory";
 
 class People {
     @KeyProperty.unique(People)
@@ -28,9 +31,9 @@ describe("collection basics", () => {
     }
 
     it("stores simple objects correctly", async () => {
-        const store = new PathJSONStore(new MemoryStringKVStore());
-        const collection1 = new Collection(store, ["people", "a"], People);
-        const collection2 = new Collection(store, ["people", "a", "b"], People);
+        const store = newPathJSONStore();
+        const collection1 = new Collection(new Directory(store, ["people", "a"]), People);
+        const collection2 = new Collection(new Directory(store, ["people", "a", "b"]), People);
 
         expect(await collection1.getAllPrimaryKeys()).members([]);
         expect(await collection2.getAllPrimaryKeys()).members([]);
@@ -91,8 +94,8 @@ describe("collection basics", () => {
     });
 
     it("queries items correctly", async () => {
-        const store = new PathJSONStore(new MemoryStringKVStore());
-        const collection = new Collection(store, ["people", "a"], People);
+        const store = newPathJSONStore();
+        const collection = new Collection(new Directory(store, ["people", "a"]), People);
 
         const pep1 = new People({
             id: 1,

@@ -1,12 +1,18 @@
-import { PathJSONStore } from "./storage/path";
+import { URIPathEncoding } from "./storage/path";
 import { EdgeLog } from "./core/blog";
 
 import { WorkerStringKVStore } from "./worker";
-import { Application, HTTPResponse, HTTPRequest } from "./application";
+import { Application, HTTPResponse } from "./application";
+import { JSONEncoding } from "./storage/encoding";
+import { EncodedStore } from "./storage/kv";
+import { Directory } from "./storage/containers/directory";
 
-const kv = new WorkerStringKVStore(TEST_KV);
-const db = new PathJSONStore(kv);
-const blog = new EdgeLog(db);
+const store = new EncodedStore(
+    new WorkerStringKVStore(TEST_KV),
+    new URIPathEncoding(),
+    new JSONEncoding()
+);
+const blog = new EdgeLog(new Directory(store, []));
 
 class MainApplication extends Application {
     @Application.get("/version")

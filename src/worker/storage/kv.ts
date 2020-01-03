@@ -1,4 +1,4 @@
-import { Encoding } from "./encoding";
+import { Encoding, PrefixableEncoding } from "./encoding";
 
 /**
  * An abstraction for a simple kv store
@@ -13,28 +13,6 @@ export abstract class KVStore<K, V> {
         for (const [k, v] of keyValuePairs) {
             await this.set(k, v);
         }
-    }
-}
-
-export class PrefixedKVStore<V> extends KVStore<string, V> {
-    constructor(private prefix: string, private store: KVStore<string, V>) {
-        super();
-    }
-
-    async get(key: string): Promise<V | null> {
-        return await this.store.get(this.prefix + key);
-    }
-
-    async set(key: string, value: V): Promise<void> {
-        await this.store.set(this.prefix + key, value);
-    }
-
-    async delete(key: string): Promise<void> {
-        await this.store.delete(this.prefix + key);
-    }
-
-    async list(prefix: string): Promise<string[]> {
-        return await this.store.list(this.prefix + prefix);
     }
 }
 
@@ -93,7 +71,10 @@ export class ValueEncodedStore<K, S, T> extends KVStore<K, S> {
 }
 
 export class KeyEncodedStore<S, T, V> extends KVStore<S, V> {
-    constructor(private base: KVStore<T, V>, private encoding: Encoding<S, T>) {
+    constructor(
+        private base: KVStore<T, V>,
+        private encoding: PrefixableEncoding<S, T>
+    ) {
         super();
     }
 
@@ -116,14 +97,30 @@ export class KeyEncodedStore<S, T, V> extends KVStore<S, V> {
         const keys = await this.base.list(this.encoding.encode(prefix));
         const decodedKeys: S[] = [];
 
+        // the set of keys that have encode(prefix) as prefix
+        // must yield the exact set of keys after decoding (all have the original "prefix" as prefix)
+        // by the assumption of PrefixableEncoding
         for (const key of keys) {
             const decoded = this.encoding.decode(key);
 
+            // filter out invalid keys and non-prefix keys
+            // since the condition for a PrefixableEncoding
+            // is not bidirectional
             if (decoded !== null) {
                 decodedKeys.push(decoded);
             }
         }
 
         return decodedKeys;
+    }
+}
+
+export class EncodedStore<KS, KT, VS, VT> extends KeyEncodedStore<KS, KT, VS> {
+    constructor(
+        base: KVStore<KT, VT>,
+        keyEncoding: Encoding<KS, KT>,
+        valueEncoding: Encoding<VS, VT>
+    ) {
+        super(new ValueEncodedStore(base, valueEncoding), keyEncoding);
     }
 }

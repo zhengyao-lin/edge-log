@@ -1,12 +1,7 @@
 import { expect } from "chai";
 
-import {
-    Path,
-    PathJSONStore,
-    SeparatorPathEncoding,
-} from "../../src/worker/storage/path";
-import { MemoryStringKVStore } from "../../src/worker/storage/kv";
-import { CookieJar } from "../../src/worker/application";
+import { Path, SeparatorPathEncoding } from "../../src/worker/storage/path";
+import { newPathJSONStore } from "./kv";
 
 describe("separator path scheme", () => {
     it("is bijective", () => {
@@ -26,7 +21,7 @@ describe("separator path scheme", () => {
 
 describe("PathJSONStore basics", () => {
     it("set/get/list values correctly", async () => {
-        const store = new PathJSONStore(new MemoryStringKVStore());
+        const store = newPathJSONStore();
 
         await store.set(["this", "is", "a", "path"], { a: 1, b: 2 });
         await store.set(["this", "is", "2nd", "path"], { a: 1, b: 3 });

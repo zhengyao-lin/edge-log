@@ -10,6 +10,13 @@ export interface Encoding<S, T> {
 }
 
 /**
+ * Same as encoding but with the additional property:
+ * for all a: S, b: S,
+ * a is a prefix of b <=> encode(a) is a prefix of encode(b)
+ */
+export type PrefixableEncoding<S, T> = Encoding<S, T>;
+
+/**
  * A trivial id encoding
  */
 export class IdentityEncoding<S> implements Encoding<S, S> {

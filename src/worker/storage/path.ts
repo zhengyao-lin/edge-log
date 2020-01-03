@@ -1,21 +1,45 @@
-import { KVStore, ValueEncodedStore, KeyEncodedStore } from "./kv";
-import {
-    Encoding,
-    BaseReductionEncoding,
-    JSONEncodable,
-    JSONEncoding,
-} from "./encoding";
+import { BaseReductionEncoding, PrefixableEncoding } from "./encoding";
+
+/**
+ * There are two types of path prefixes in the project:
+ * - Strong prefix
+ *   for any path a, b, a is a strong prefix of b if
+ *   - len(a) <= len(b)
+ *   - a == b[0:len(b)] element-wise
+ *
+ * - Weak prefix
+ *   for any path a, b, a is a weak prefix of b if either
+ *   - a is [] or
+ *   - a[0:-1] is a strong prefix of b and a[-1] is a prefix of b[-1]
+ */
 
 export type Path = string[];
 
-/**
- * PathEncoding is an encoding with the additional property that
- * for all a: string, b: string, path: Path,
- * a is a prefix of b => encode(path + [a]) is a prefix of encode(path + [b])
- */
-export type PathEncoding = Encoding<Path, string>;
+export function isStrongPrefixOf(a: Path, b: Path): boolean {
+    if (a.length > b.length) return false;
 
-export class URIPathEncoding implements PathEncoding {
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export function isWeakPrefixOf(a: Path, b: Path): boolean {
+    if (a.length > b.length) return false;
+
+    for (let i = 0; i < a.length - 1; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+
+    return a.length == 0 || b[a.length - 1].startsWith(a[a.length - 1]);
+}
+
+export class URIPathEncoding implements PrefixableEncoding<Path, string> {
     constructor() {}
 
     encode(path: Path): string {
@@ -27,7 +51,7 @@ export class URIPathEncoding implements PathEncoding {
     }
 }
 
-export class SeparatorPathEncoding implements PathEncoding {
+export class SeparatorPathEncoding implements PrefixableEncoding<Path, string> {
     private base: BaseReductionEncoding;
 
     constructor(private separator: string = "\0") {
@@ -40,30 +64,5 @@ export class SeparatorPathEncoding implements PathEncoding {
 
     decode(key: string): Path | null {
         return key.split(this.separator).map(this.base.decode.bind(this.base));
-    }
-}
-
-export class PathValueStore<V> extends KeyEncodedStore<Path, string, V> {
-    constructor(
-        base: KVStore<string, V>,
-        encoding: PathEncoding = new URIPathEncoding()
-    ) {
-        super(base, encoding);
-    }
-}
-
-/**
- * A "path"-indexed kv store for storing JSON encoded objects
- */
-export class PathJSONStore extends KeyEncodedStore<
-    Path,
-    string,
-    JSONEncodable
-> {
-    constructor(
-        base: KVStore<string, string>,
-        encoding: PathEncoding = new URIPathEncoding()
-    ) {
-        super(new ValueEncodedStore(base, new JSONEncoding()), encoding);
     }
 }
