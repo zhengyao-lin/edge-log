@@ -16,8 +16,31 @@ export class IdentityEncoding<S> implements Encoding<S, S> {
     encode(s: S): S {
         return s;
     }
+
     decode(t: S): S | null {
         return t;
+    }
+}
+
+export type JSONEncodable =
+    | null
+    | string
+    | number
+    | boolean
+    | { [key: string]: JSONEncodable }
+    | JSONEncodable[];
+
+export class JSONEncoding implements Encoding<JSONEncodable, string> {
+    encode(obj: JSONEncodable): string {
+        return JSON.stringify(obj);
+    }
+
+    decode(str: string): JSONEncodable | null {
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            return null;
+        }
     }
 }
 

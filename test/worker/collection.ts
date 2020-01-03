@@ -15,6 +15,11 @@ class People {
     constructor(config: Partial<People>) {
         Object.assign(this, config);
     }
+
+    // to check that dummy would not be included
+    dummy(): string {
+        return "hi";
+    }
 }
 
 describe("collection basics", () => {

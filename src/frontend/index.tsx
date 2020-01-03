@@ -5,9 +5,7 @@ import "./index.css";
 
 class App extends Component {
     render() {
-        return <div id="root">
-            front-end
-        </div>;
+        return <div id="root">front-end</div>;
     }
 }
 

@@ -1,3 +1,5 @@
+import { Encoding } from "./encoding";
+
 /**
  * An abstraction for a simple kv store
  */
@@ -59,5 +61,69 @@ export class MemoryStringKVStore<V> extends KVStore<string, V> {
 
     async list(prefix: string): Promise<string[]> {
         return Array.from(this.map.keys()).filter(s => s.startsWith(prefix));
+    }
+}
+
+export class ValueEncodedStore<K, S, T> extends KVStore<K, S> {
+    constructor(private base: KVStore<K, T>, private encoding: Encoding<S, T>) {
+        super();
+    }
+
+    async get(key: K): Promise<S | null> {
+        const encoded = await this.base.get(key);
+        if (encoded === null) return null;
+
+        const value = this.encoding.decode(encoded);
+        if (value === null) return null;
+
+        return value;
+    }
+
+    async set(key: K, value: S): Promise<void> {
+        await this.base.set(key, this.encoding.encode(value));
+    }
+
+    async delete(key: K): Promise<void> {
+        await this.base.delete(key);
+    }
+
+    async list(prefix: K): Promise<K[]> {
+        return await this.base.list(prefix);
+    }
+}
+
+export class KeyEncodedStore<S, T, V> extends KVStore<S, V> {
+    constructor(private base: KVStore<T, V>, private encoding: Encoding<S, T>) {
+        super();
+    }
+
+    async get(key: S): Promise<V | null> {
+        return await this.base.get(this.encoding.encode(key));
+    }
+
+    async set(key: S, value: V): Promise<void> {
+        await this.base.set(this.encoding.encode(key), value);
+    }
+
+    async delete(key: S): Promise<void> {
+        await this.base.delete(this.encoding.encode(key));
+    }
+
+    /**
+     * base list composed with decoding
+     */
+    async list(prefix: S): Promise<S[]> {
+        const keys = await this.base.list(this.encoding.encode(prefix));
+        const decodedKeys: S[] = [];
+
+        for (const key of keys) {
+            const decoded = this.encoding.decode(key);
+
+            if (decoded !== null) {
+                decodedKeys.push(decoded);
+            }
+        }
+
+        return decodedKeys;
     }
 }

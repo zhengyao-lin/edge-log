@@ -1,9 +1,12 @@
-import { KVStore } from "./kv";
-import { assert } from "../utils";
-import { Encoding, BaseReductionEncoding } from "./encoding";
+import { KVStore, ValueEncodedStore, KeyEncodedStore } from "./kv";
+import {
+    Encoding,
+    BaseReductionEncoding,
+    JSONEncodable,
+    JSONEncoding,
+} from "./encoding";
 
 export type Path = string[];
-export type JSONEncodable = any;
 
 /**
  * PathEncoding is an encoding with the additional property that
@@ -40,58 +43,27 @@ export class SeparatorPathEncoding implements PathEncoding {
     }
 }
 
+export class PathValueStore<V> extends KeyEncodedStore<Path, string, V> {
+    constructor(
+        base: KVStore<string, V>,
+        encoding: PathEncoding = new URIPathEncoding()
+    ) {
+        super(base, encoding);
+    }
+}
+
 /**
  * A "path"-indexed kv store for storing JSON encoded objects
  */
-export class PathJSONStore extends KVStore<Path, JSONEncodable> {
+export class PathJSONStore extends KeyEncodedStore<
+    Path,
+    string,
+    JSONEncodable
+> {
     constructor(
-        private base: KVStore<string, string>,
-        private pathEncoding: PathEncoding = new URIPathEncoding()
+        base: KVStore<string, string>,
+        encoding: PathEncoding = new URIPathEncoding()
     ) {
-        super();
-    }
-
-    async get(path: Path): Promise<JSONEncodable | null> {
-        const stringValue = await this.base.get(this.pathEncoding.encode(path));
-
-        if (stringValue === null) {
-            return null;
-        }
-
-        // TODO: need runtime type checking
-        try {
-            return JSON.parse(stringValue);
-        } catch (e) {
-            return null; // treat ill-formatted content as null
-        }
-    }
-
-    async set(path: Path, obj: JSONEncodable): Promise<void> {
-        await this.base.set(
-            this.pathEncoding.encode(path),
-            JSON.stringify(obj)
-        );
-    }
-
-    async delete(path: Path): Promise<void> {
-        await this.base.delete(this.pathEncoding.encode(path));
-    }
-
-    /**
-     * return keys of kv pairs under a path (only the last path component is returned)
-     */
-    async list(prefix: Path): Promise<Path[]> {
-        const keys = await this.base.list(this.pathEncoding.encode(prefix));
-        const paths: Path[] = [];
-
-        for (const key of keys) {
-            const path = this.pathEncoding.decode(key);
-
-            if (path !== null) {
-                paths.push(path);
-            }
-        }
-
-        return paths;
+        super(new ValueEncodedStore(base, new JSONEncoding()), encoding);
     }
 }

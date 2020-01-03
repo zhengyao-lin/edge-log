@@ -1,7 +1,7 @@
-import { Path, JSONEncodable } from "./path";
+import { Path } from "./path";
 import { KVStore } from "./kv";
 import { assert } from "../utils";
-import { Encoding, BaseReductionEncoding } from "./encoding";
+import { Encoding, BaseReductionEncoding, JSONEncodable } from "./encoding";
 
 /**
  * Containers built on a path-JSON store
@@ -11,7 +11,7 @@ import { Encoding, BaseReductionEncoding } from "./encoding";
  * Configuration is a cached single object
  * that can be used to access individual fields
  */
-export abstract class Configuration<T> {
+export abstract class Configuration<T extends JSONEncodable> {
     private config: T | null = null;
 
     constructor(
@@ -364,11 +364,12 @@ export class Collection<T> {
             if (this.isPrimaryKey(key)) {
                 const v = obj[key]; // add a temporary value to make type checker happy
 
-                if (Collection.isValidPrimaryKey(v)) {
-                    primaryKeys[key.toString()] = v;
-                } else {
-                    assert(false, `value "${v}" is not a valid primary key`);
-                }
+                assert(
+                    Collection.isValidPrimaryKey(v),
+                    `value "${v}" is not a valid primary key`
+                );
+
+                primaryKeys[key.toString()] = v;
             } else {
                 value[key.toString()] = obj[key];
             }
@@ -424,10 +425,10 @@ export class Collection<T> {
             `"${key}" is not a unique key`
         );
 
-        if (!Collection.isValidPrimaryKey(value)) {
-            assert(false, `${value} is not a valid primary key value`);
-            return null;
-        }
+        assert(
+            Collection.isValidPrimaryKey(value),
+            `${value} is not a valid primary key value`
+        );
 
         const prefix = this.keyEncoding.encodeUniqueKeyPrefix(value);
         const rawKeys = await this.listImmediatePrefix(prefix);
@@ -445,7 +446,7 @@ export class Collection<T> {
 
         const partial: Partial<T> = {
             ...primaryKeys,
-            ...dataKeys,
+            ...(dataKeys as any),
         };
 
         return new this.cons(partial);

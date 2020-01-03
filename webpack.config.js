@@ -1,4 +1,6 @@
 const path = require("path");
+const HTMLWebpackPlugin = require("html-webpack-plugin");
+const ScriptExtHtmlWebpackPlugin = require("script-ext-html-webpack-plugin");
 
 const common = {
     mode: process.env.NODE_ENV || "production",
@@ -20,8 +22,8 @@ const merge = (a, b) => Object.assign({}, a, b);
 const babelLoader = {
     loader: "babel-loader",
     options: {
-        presets: ["@babel/env", "@babel/preset-react"]
-    }
+        presets: ["@babel/env", "@babel/preset-react"],
+    },
 };
 
 module.exports = [
@@ -30,9 +32,10 @@ module.exports = [
      */
     merge(common, {
         entry: "./src/worker/index.ts",
-        output: merge(common.output, {
-            filename: `worker/index.js`,
-        }),
+        output: {
+            filename: `index.js`,
+            path: path.join(__dirname, "dist/worker"),
+        },
         module: {
             rules: [
                 {
@@ -49,9 +52,10 @@ module.exports = [
      */
     merge(common, {
         entry: "./src/frontend/index.tsx",
-        output: merge(common.output, {
-            filename: `frontend/index.js`,
-        }),
+        output: {
+            filename: `index.js`,
+            path: path.join(__dirname, "dist/frontend"),
+        },
         module: {
             rules: [
                 {
@@ -65,5 +69,14 @@ module.exports = [
                 },
             ],
         },
+        plugins: [
+            new HTMLWebpackPlugin({
+                filename: "index.html",
+                template: "src/frontend/index.ejs",
+            }),
+            new ScriptExtHtmlWebpackPlugin({
+                inline: "index.js",
+            }),
+        ],
     }),
 ];
