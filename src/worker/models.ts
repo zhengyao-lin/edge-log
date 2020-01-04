@@ -1,4 +1,4 @@
-import { KeyProperty, Collection } from "./storage/containers/collection";
+import { KeyProperty, Collection, Cursor } from "./storage/containers/collection";
 import { Configuration } from "./storage/containers/configuration";
 import BLAKE2s from "blake2s-js";
 import { uuid4 } from "./utils";
@@ -58,9 +58,6 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
     }
 }
 
-/**
- * Class representing a (blog) post
- */
 export class Post {
     @KeyProperty.unique(Post)
     public id: string;
@@ -156,5 +153,12 @@ export class EdgeLog {
 
     async getPost(id: string): Promise<Post | null> {
         return await this.postCollection.getByUniqueKey("id", id);
+    }
+
+    /**
+     * Get all posts in reverse order of creation
+     */
+    async listPost(): Promise<Cursor<Post>> {
+        return await this.postCollection.query([{}], "timeOfCreation", (a, b) => { return b - a; });
     }
 }

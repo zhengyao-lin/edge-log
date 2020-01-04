@@ -23,18 +23,24 @@ export class Route {
 export class HTTPRequest {
     public method: string;
     public url: URL;
+    public query: URLSearchParams;
     public headers: any;
     public cookie: CookieJar;
 
     constructor(private request: Request) {
         this.method = request.method;
         this.url = new URL(request.url);
+        this.query = this.url.searchParams;
         this.headers = request.headers;
         this.cookie = new CookieJar(request.headers.get("cookie") || "");
     }
 
     async formData(): Promise<FormData> {
         return await this.request.formData();
+    }
+
+    async json(): Promise<any> {
+        return await this.request.json();
     }
 }
 
@@ -67,6 +73,10 @@ export abstract class Application {
         return { text: "404 not found", status: 404 };
     }
 
+    async handleInternalError(request: HTTPRequest): Promise<HTTPResponse> {
+        return { text: "500 internal error", status: 500 };
+    }
+
     async handleRequest(request: Request): Promise<Response> {
         const parsedRequest = new HTTPRequest(request);
 
@@ -76,11 +86,20 @@ export abstract class Application {
             const match = route.match(parsedRequest);
 
             if (match !== null) {
-                const handler: RequestHandler = (this as any)[route.handler];
+                const handler: RequestHandler = (this as any)[route.handler].bind(this);
 
-                return Application.encodeResponse(
-                    await handler(parsedRequest, ...match.slice(1))
-                );
+                try {
+                    const response = await handler(
+                        parsedRequest,
+                        ...match.slice(1)
+                    );
+                    return Application.encodeResponse(response);
+                } catch (e) {
+                    console.log(e);
+                    return Application.encodeResponse(
+                        await this.handleInternalError(parsedRequest)
+                    );
+                }
             }
         }
 
@@ -148,7 +167,7 @@ export abstract class Application {
 }
 
 export class CookieJar {
-    [x: string]: string;
+    [key: string]: string;
 
     constructor(cookie: string) {
         /**

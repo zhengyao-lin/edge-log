@@ -89,6 +89,26 @@ export class Cursor<T> {
         this.cache = [];
     }
 
+    take(n: number): Cursor<T> {
+        return new Cursor<T>(this.collection, this.rawKeys.slice(0, n));
+    }
+
+    skip(n: number): Cursor<T> {
+        return new Cursor<T>(this.collection, this.rawKeys.slice(n));
+    }
+
+    async getAll(): Promise<T[]> {
+        const result: T[] = [];
+
+        for await (const t of this) {
+            if (t !== null) {
+                result.push(t);
+            }
+        }
+
+        return result;
+    }
+
     [Symbol.asyncIterator](): AsyncIterator<T | null> {
         let position = 0;
 
@@ -538,15 +558,26 @@ export class Collection<T> {
      * the list of items satisfying at least one of the
      * conditions
      */
-    async query(query: Query<T>): Promise<Cursor<T>> {
+    async query<K extends keyof T = any>(query: Query<T>, sortBy?: K, compare?: (a: T[K], b: T[K]) => number): Promise<Cursor<T>> {
         const primaryKeysSet = await this.getAllPrimaryKeys();
         const rawKeys: string[] = [];
+        const sortedPrimaryKeysList = [];
 
         for (const primaryKeys of primaryKeysSet) {
             if (this.matchQuery(primaryKeys, query)) {
-                rawKeys.push(this.keyEncoding.encode(primaryKeys));
+                sortedPrimaryKeysList.push(primaryKeys);
             }
         }
+
+        if (sortBy !== undefined && compare !== undefined) {
+            assert(this.isPrimaryKey(sortBy), "sort index is not a primary key");
+
+            sortedPrimaryKeysList.sort((a, b) => {
+                return compare(a[sortBy.toString()] as any, b[sortBy.toString()] as any);
+            });
+        }
+
+        sortedPrimaryKeysList.forEach(v => rawKeys.push(this.keyEncoding.encode(v)));
 
         return new Cursor(this, rawKeys);
     }
