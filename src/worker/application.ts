@@ -79,7 +79,7 @@ export abstract class Application {
                 const handler: RequestHandler = (this as any)[route.handler];
 
                 return Application.encodeResponse(
-                    await handler(parsedRequest, match.slice(1))
+                    await handler(parsedRequest, ...match.slice(1))
                 );
             }
         }
@@ -95,7 +95,7 @@ export abstract class Application {
         const status =
             responseObj["status"] !== undefined ? responseObj["status"] : 200;
 
-        let response;
+        let response: string | ReadableStream = "";
 
         if ("json" in responseObj) {
             response = JSON.stringify(responseObj["json"]);
@@ -106,6 +106,8 @@ export abstract class Application {
         } else if ("html" in responseObj) {
             response = responseObj["html"];
             headers["content-type"] = "text/html";
+        } else if ("stream" in responseObj) {
+            response = responseObj["stream"];
         }
 
         let key: keyof HTTPHeaders;
@@ -121,6 +123,27 @@ export abstract class Application {
             status,
             headers: encodedHeaders,
         });
+    }
+
+    static inferContentType(fileName: string): ContentType {
+        const dotIndex = fileName.lastIndexOf(".");
+
+        if (dotIndex != -1) {
+            const suffix = fileName.substr(dotIndex + 1);
+            const contentTypeMap: Record<string, ContentType> = {
+                json: "application/json",
+                js: "application/javascript",
+                html: "text/html",
+                css: "text/css",
+                txt: "text/html",
+            };
+
+            if ((contentTypeMap as Object).hasOwnProperty(suffix)) {
+                return contentTypeMap[suffix];
+            }
+        }
+
+        return "application/octet-stream";
     }
 }
 
@@ -157,15 +180,23 @@ CookieJar.prototype.toString = function(): string {
 
 export type RequestHandler = (
     r: HTTPRequest,
-    m: string[]
+    ...m: string[]
 ) => Promise<HTTPResponse>;
 
 export type ApplicationPrototype = {
     [Application.ROUTE_NAME]: Route[];
 };
 
+export type ContentType =
+    | "application/json"
+    | "application/javascript"
+    | "application/octet-stream"
+    | "text/plain"
+    | "text/css"
+    | "text/html";
+
 export type HTTPHeaders = {
-    "content-type"?: string;
+    "content-type"?: ContentType;
     "set-cookie"?: CookieJar;
     cookie?: CookieJar;
 };
@@ -173,4 +204,9 @@ export type HTTPHeaders = {
 export type HTTPResponse = {
     status?: number;
     headers?: HTTPHeaders;
-} & ({ json: any } | { text: string } | { html: string });
+} & (
+    | { json: any }
+    | { text: string }
+    | { html: string }
+    | { stream: ReadableStream }
+);

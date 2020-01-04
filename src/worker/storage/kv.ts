@@ -9,7 +9,7 @@ export abstract class KVStore<K, V> {
     abstract async delete(key: K): Promise<void>;
     abstract async list(prefix: K): Promise<K[]>;
 
-    async setBatch(keyValuePairs: [K, V][]): Promise<void> {
+    async setBatch(keyValuePairs: [K, V][]) {
         for (const [k, v] of keyValuePairs) {
             await this.set(k, v);
         }
@@ -29,11 +29,11 @@ export class MemoryStringKVStore<V> extends KVStore<string, V> {
         return v === undefined ? null : v;
     }
 
-    async set(key: string, value: V): Promise<void> {
+    async set(key: string, value: V) {
         this.map.set(key, value);
     }
 
-    async delete(key: string): Promise<void> {
+    async delete(key: string) {
         this.map.delete(key);
     }
 
@@ -57,11 +57,11 @@ export class ValueEncodedStore<K, S, T> extends KVStore<K, S> {
         return value;
     }
 
-    async set(key: K, value: S): Promise<void> {
+    async set(key: K, value: S) {
         await this.base.set(key, this.encoding.encode(value));
     }
 
-    async delete(key: K): Promise<void> {
+    async delete(key: K) {
         await this.base.delete(key);
     }
 
@@ -82,11 +82,11 @@ export class KeyEncodedStore<S, T, V> extends KVStore<S, V> {
         return await this.base.get(this.encoding.encode(key));
     }
 
-    async set(key: S, value: V): Promise<void> {
+    async set(key: S, value: V) {
         await this.base.set(this.encoding.encode(key), value);
     }
 
-    async delete(key: S): Promise<void> {
+    async delete(key: S) {
         await this.base.delete(this.encoding.encode(key));
     }
 

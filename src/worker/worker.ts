@@ -14,11 +14,11 @@ export abstract class WorkerKVStore<
 
     abstract async get(key: string): Promise<V | null>;
 
-    async set(key: string, value: V): Promise<void> {
+    async set(key: string, value: V) {
         await this.namespace.put(key, value);
     }
 
-    async delete(key: string): Promise<void> {
+    async delete(key: string) {
         await this.namespace.delete(key);
     }
 

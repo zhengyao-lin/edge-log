@@ -326,7 +326,7 @@ export class Collection<T> {
         return [primaryKeys, value];
     }
 
-    async add(obj: T): Promise<void> {
+    async add(obj: T) {
         const [primaryKeys, value] = this.separatePrimaryKeys(obj);
         const key = this.keyEncoding.encode(primaryKeys);
 

@@ -1,9 +1,5 @@
 import uuid from "uuid";
 
-export function sameType<A, B>(): boolean {
-    return typeof ({} as A) === typeof ({} as B);
-}
-
 export function assert(
     condition: boolean,
     msg: string = "unknown error"

@@ -1,5 +1,8 @@
 import { expect } from "chai";
-import { isStrongPrefixOf, isWeakPrefixOf } from "../../src/worker/storage/path";
+import {
+    isStrongPrefixOf,
+    isWeakPrefixOf,
+} from "../../src/worker/storage/path";
 
 describe("strong prefix", () => {
     it("is reflexive", () => {

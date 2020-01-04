@@ -32,8 +32,14 @@ describe("collection basics", () => {
 
     it("stores simple objects correctly", async () => {
         const store = newPathJSONStore();
-        const collection1 = new Collection(new Directory(store, ["people", "a"]), People);
-        const collection2 = new Collection(new Directory(store, ["people", "a", "b"]), People);
+        const collection1 = new Collection(
+            new Directory(store, ["people", "a"]),
+            People
+        );
+        const collection2 = new Collection(
+            new Directory(store, ["people", "a", "b"]),
+            People
+        );
 
         expect(await collection1.getAllPrimaryKeys()).members([]);
         expect(await collection2.getAllPrimaryKeys()).members([]);
@@ -95,7 +101,10 @@ describe("collection basics", () => {
 
     it("queries items correctly", async () => {
         const store = newPathJSONStore();
-        const collection = new Collection(new Directory(store, ["people", "a"]), People);
+        const collection = new Collection(
+            new Directory(store, ["people", "a"]),
+            People
+        );
 
         const pep1 = new People({
             id: 1,

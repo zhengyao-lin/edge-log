@@ -8,11 +8,11 @@ export class Directory<V> {
         return await this.base.get(this.basePath.concat(path));
     }
 
-    async set(path: Path, value: V): Promise<void> {
+    async set(path: Path, value: V) {
         await this.base.set(this.basePath.concat(path), value);
     }
 
-    async delete(path: Path): Promise<void> {
+    async delete(path: Path) {
         await this.base.delete(this.basePath.concat(path));
     }
 
