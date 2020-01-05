@@ -2,9 +2,9 @@ import { expect } from "chai";
 import {
     KeyProperty,
     Collection,
-} from "../../src/worker/storage/containers/collection";
+} from "../../src/framework/storage/containers/collection";
 import { newPathJSONStore } from "./kv";
-import { Directory } from "../../src/worker/storage/containers/directory";
+import { Directory } from "../../src/framework/storage/containers/directory";
 
 class People {
     @KeyProperty.unique(People)

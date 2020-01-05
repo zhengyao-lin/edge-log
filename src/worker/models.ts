@@ -1,9 +1,13 @@
-import { KeyProperty, Collection, Cursor } from "./storage/containers/collection";
-import { Configuration } from "./storage/containers/configuration";
+import {
+    KeyProperty,
+    Collection,
+    Cursor,
+} from "../framework/storage/containers/collection";
+import { Configuration } from "../framework/storage/containers/configuration";
 import BLAKE2s from "blake2s-js";
-import { uuid4 } from "./utils";
-import { Directory } from "./storage/containers/directory";
-import { JSONEncodable } from "./storage/encoding";
+import { uuid4 } from "../framework/utils";
+import { Directory } from "../framework/storage/containers/directory";
+import { JSONEncodable } from "../framework/storage/encoding";
 
 /**
  * Models for a single-admin blogging platform
@@ -12,15 +16,17 @@ import { JSONEncodable } from "./storage/encoding";
  *   2. post collection
  */
 
-type AdminConfigObject = {
+type SiteConfigObject = {
+    headline: string;
     passcodeHash: string;
 };
 
 /**
- * AdminConfig contains info about info about the administrator,
+ * SiteConfig contains info about info about the administrator,
  * including passcode
  */
-export class AdminConfig extends Configuration<AdminConfigObject> {
+export class SiteConfig extends Configuration<SiteConfigObject> {
+    static DEFAULT_HEADLINE = "(untitled)";
     static DEFAULT_PASSWORD = "";
     static DEFAULT_KEY = new Uint8Array([
         101,
@@ -35,17 +41,25 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
     static DEFAULT_OUTLEN = 32;
 
     async setPasscode(plain: string) {
-        await this.set("passcodeHash", AdminConfig.hash(plain));
+        await this.set("passcodeHash", SiteConfig.hash(plain));
     }
 
     async checkPasscode(plain: string): Promise<boolean> {
-        return AdminConfig.hash(plain) == (await this.get("passcodeHash"));
+        return SiteConfig.hash(plain) == (await this.get("passcodeHash"));
+    }
+
+    async getHeadline(): Promise<string> {
+        return await this.get("headline");
+    }
+
+    async setHeadline(headline: string): Promise<void> {
+        return await this.set("headline", headline);
     }
 
     static hash(msg: string): string {
         const h = new BLAKE2s(
-            AdminConfig.DEFAULT_OUTLEN,
-            AdminConfig.DEFAULT_KEY
+            SiteConfig.DEFAULT_OUTLEN,
+            SiteConfig.DEFAULT_KEY
         );
         h.update(new TextEncoder().encode(msg));
         return h.hexDigest();
@@ -53,7 +67,8 @@ export class AdminConfig extends Configuration<AdminConfigObject> {
 
     protected default() {
         return {
-            passcodeHash: AdminConfig.hash(AdminConfig.DEFAULT_PASSWORD),
+            headline: SiteConfig.DEFAULT_HEADLINE,
+            passcodeHash: SiteConfig.hash(SiteConfig.DEFAULT_PASSWORD),
         };
     }
 }
@@ -103,16 +118,14 @@ export class EdgeLog {
     static PATH_POST_COLLECTION = ["posts"];
     static PATH_SESSION_COLLECTION = ["sessions"];
 
-    private adminConfig: AdminConfig;
-    private postCollection: Collection<Post>;
-    private sessionCollection: Collection<Session>;
+    public siteConfig: SiteConfig;
+    public postCollection: Collection<Post>;
+    public sessionCollection: Collection<Session>;
 
     constructor(private base: Directory<JSONEncodable>) {
         this.base = base;
 
-        this.adminConfig = new AdminConfig(
-            base.enter(EdgeLog.PATH_ADMIN_CONFIG)
-        );
+        this.siteConfig = new SiteConfig(base.enter(EdgeLog.PATH_ADMIN_CONFIG));
 
         this.postCollection = new Collection(
             base.enter(EdgeLog.PATH_POST_COLLECTION),
@@ -130,7 +143,7 @@ export class EdgeLog {
      * Otherwise returns null
      */
     async login(passcode: string): Promise<Session | null> {
-        if (await this.adminConfig.checkPasscode(passcode)) {
+        if (await this.siteConfig.checkPasscode(passcode)) {
             const session = new Session();
             await this.sessionCollection.add(session);
             return session;
@@ -159,6 +172,12 @@ export class EdgeLog {
      * Get all posts in reverse order of creation
      */
     async listPost(): Promise<Cursor<Post>> {
-        return await this.postCollection.query([{}], "timeOfCreation", (a, b) => { return b - a; });
+        return await this.postCollection.query(
+            [{}],
+            "timeOfCreation",
+            (a, b) => {
+                return b - a;
+            }
+        );
     }
 }

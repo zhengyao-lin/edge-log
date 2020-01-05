@@ -1,12 +1,12 @@
 const path = require("path");
+const webpack = require("webpack");
 const HTMLWebpackPlugin = require("html-webpack-plugin");
-const ScriptExtHtmlWebpackPlugin = require("script-ext-html-webpack-plugin");
 
 const common = {
     mode: process.env.NODE_ENV || "production",
-    devtool: "inline-source-map",
+    // devtool: "inline-source-map",
     resolve: {
-        extensions: [".ts", ".tsx", ".js", ".jsx"],
+        extensions: [".ts", ".tsx", ".js", ".jsx", "mjs"],
     },
     output: {
         path: path.join(__dirname, "dist"),
@@ -43,6 +43,11 @@ module.exports = [
                     exclude: /node_modules/,
                     use: ["ts-loader"],
                 },
+                {
+                    test: /\.mjs$/,
+                    include: /node_modules/,
+                    type: "javascript/auto",
+                },
             ],
         },
     }),
@@ -53,8 +58,8 @@ module.exports = [
     merge(common, {
         entry: "./src/frontend/index.tsx",
         output: {
-            filename: `index.js`,
-            path: path.join(__dirname, "dist/frontend"),
+            filename: "[name].js",
+            path: path.join(__dirname, "dist/static"),
         },
         module: {
             rules: [
@@ -67,16 +72,57 @@ module.exports = [
                     test: /\.css$/,
                     use: ["style-loader", "css-loader"],
                 },
+                {
+                    test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
+                    use: [
+                        {
+                            loader: "file-loader",
+                            options: {
+                                name: "[name].[ext]",
+                                outputPath: "fonts/",
+                            },
+                        },
+                    ],
+                },
+                {
+                    test: /\.(gif|png|jpe?g|svg)$/,
+                    use: [
+                        {
+                            loader: "file-loader",
+                            options: {
+                                name: "[name].[ext]",
+                                outputPath: "images/",
+                            },
+                        },
+                    ],
+                },
             ],
         },
         plugins: [
+            new webpack.HashedModuleIdsPlugin(),
             new HTMLWebpackPlugin({
                 filename: "index.html",
                 template: "src/frontend/index.ejs",
             }),
-            new ScriptExtHtmlWebpackPlugin({
-                inline: "index.js",
-            }),
         ],
+        optimization: {
+            splitChunks: {
+                chunks: "all",
+                maxInitialRequests: Infinity,
+                minSize: 0,
+                cacheGroups: {
+                    vendor: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name(module) {
+                            const packageName = module.context.match(
+                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                            )[1];
+
+                            return `npm.${packageName.replace("@", "")}`;
+                        },
+                    },
+                },
+            },
+        },
     }),
 ];

@@ -1,6 +1,6 @@
 import { expect } from "chai";
 
-import { Path, SeparatorPathEncoding } from "../../src/worker/storage/path";
+import { Path, SeparatorPathEncoding } from "../../src/framework/storage/path";
 import { newPathJSONStore } from "./kv";
 
 describe("separator path scheme", () => {

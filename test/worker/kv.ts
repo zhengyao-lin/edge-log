@@ -3,9 +3,12 @@ import {
     MemoryStringKVStore,
     KVStore,
     EncodedStore,
-} from "../../src/worker/storage/kv";
-import { JSONEncodable, JSONEncoding } from "../../src/worker/storage/encoding";
-import { Path, URIPathEncoding } from "../../src/worker/storage/path";
+} from "../../src/framework/storage/kv";
+import {
+    JSONEncodable,
+    JSONEncoding,
+} from "../../src/framework/storage/encoding";
+import { Path, URIPathEncoding } from "../../src/framework/storage/path";
 
 export function newPathJSONStore(): KVStore<Path, JSONEncodable> {
     return new EncodedStore(

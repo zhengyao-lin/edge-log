@@ -1,6 +1,6 @@
 import { KVNamespace } from "@cloudflare/workers-types";
 
-import { KVStore } from "./storage/kv";
+import { KVStore } from "../framework/storage/kv";
 
 /**
  * A wrapper for the worker kv store

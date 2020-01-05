@@ -1,3 +1,5 @@
+import { graphql, GraphQLSchema } from "graphql";
+
 /**
  * Minimal web application framework
  */
@@ -24,7 +26,7 @@ export class HTTPRequest {
     public method: string;
     public url: URL;
     public query: URLSearchParams;
-    public headers: any;
+    public headers: Headers;
     public cookie: CookieJar;
 
     constructor(private request: Request) {
@@ -41,6 +43,10 @@ export class HTTPRequest {
 
     async json(): Promise<any> {
         return await this.request.json();
+    }
+
+    async text(): Promise<string> {
+        return await this.request.text();
     }
 }
 
@@ -68,6 +74,7 @@ export abstract class Application {
     static post = Application.method("post");
     static put = Application.method("put");
     static delete = Application.method("delete");
+    static options = Application.method("options");
 
     async handleNotFound(request: HTTPRequest): Promise<HTTPResponse> {
         return { text: "404 not found", status: 404 };
@@ -75,6 +82,40 @@ export abstract class Application {
 
     async handleInternalError(request: HTTPRequest): Promise<HTTPResponse> {
         return { text: "500 internal error", status: 500 };
+    }
+
+    async getGraphQLQuery(request: HTTPRequest): Promise<string | null> {
+        switch (request.method.toLowerCase()) {
+            case "get":
+                return request.query.get("query");
+
+            case "post":
+                switch (request.headers.get("content-type")) {
+                    case "application/json":
+                        return ((await request.json()) as { query: string })
+                            .query;
+
+                    case "application/graphql":
+                        return await request.text();
+                }
+        }
+
+        return null;
+    }
+
+    async handleGraphQLRequest(
+        schema: GraphQLSchema,
+        request: HTTPRequest
+    ): Promise<HTTPResponse> {
+        const query = await this.getGraphQLQuery(request);
+
+        if (query === null) {
+            return { status: 400, text: "400 bad request" };
+        }
+
+        return {
+            json: await graphql(schema, query),
+        };
     }
 
     async handleRequest(request: Request): Promise<Response> {
@@ -86,7 +127,9 @@ export abstract class Application {
             const match = route.match(parsedRequest);
 
             if (match !== null) {
-                const handler: RequestHandler = (this as any)[route.handler].bind(this);
+                const handler: RequestHandler = (this as any)[
+                    route.handler
+                ].bind(this);
 
                 try {
                     const response = await handler(
@@ -217,6 +260,9 @@ export type ContentType =
 export type HTTPHeaders = {
     "content-type"?: ContentType;
     "set-cookie"?: CookieJar;
+    "access-control-allow-origin"?: string;
+    "access-control-allow-headers"?: string;
+    "access-control-allow-methods"?: string;
     cookie?: CookieJar;
 };
 
@@ -228,4 +274,5 @@ export type HTTPResponse = {
     | { text: string }
     | { html: string }
     | { stream: ReadableStream }
+    | {}
 );

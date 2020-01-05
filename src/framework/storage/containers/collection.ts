@@ -558,7 +558,11 @@ export class Collection<T> {
      * the list of items satisfying at least one of the
      * conditions
      */
-    async query<K extends keyof T = any>(query: Query<T>, sortBy?: K, compare?: (a: T[K], b: T[K]) => number): Promise<Cursor<T>> {
+    async query<K extends keyof T = any>(
+        query: Query<T>,
+        sortBy?: K,
+        compare?: (a: T[K], b: T[K]) => number
+    ): Promise<Cursor<T>> {
         const primaryKeysSet = await this.getAllPrimaryKeys();
         const rawKeys: string[] = [];
         const sortedPrimaryKeysList = [];
@@ -570,14 +574,22 @@ export class Collection<T> {
         }
 
         if (sortBy !== undefined && compare !== undefined) {
-            assert(this.isPrimaryKey(sortBy), "sort index is not a primary key");
+            assert(
+                this.isPrimaryKey(sortBy),
+                "sort index is not a primary key"
+            );
 
             sortedPrimaryKeysList.sort((a, b) => {
-                return compare(a[sortBy.toString()] as any, b[sortBy.toString()] as any);
+                return compare(
+                    a[sortBy.toString()] as any,
+                    b[sortBy.toString()] as any
+                );
             });
         }
 
-        sortedPrimaryKeysList.forEach(v => rawKeys.push(this.keyEncoding.encode(v)));
+        sortedPrimaryKeysList.forEach(v =>
+            rawKeys.push(this.keyEncoding.encode(v))
+        );
 
         return new Cursor(this, rawKeys);
     }

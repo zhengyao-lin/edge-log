@@ -1,7 +1,7 @@
 import { WorkerAPI } from "./api";
-import { KVStore, KeyEncodedStore } from "../worker/storage/kv";
-import { URIPathEncoding, Path } from "../worker/storage/path";
-import { Directory } from "../worker/storage/containers/directory";
+import { KVStore, KeyEncodedStore } from "../framework/storage/kv";
+import { URIPathEncoding, Path } from "../framework/storage/path";
+import { Directory } from "../framework/storage/containers/directory";
 
 import yargs from "yargs";
 import { promises as fsPromises } from "fs";
