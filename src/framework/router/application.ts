@@ -84,37 +84,80 @@ export abstract class Application {
         return { text: "500 internal error", status: 500 };
     }
 
-    async getGraphQLQuery(request: HTTPRequest): Promise<string | null> {
+    /**
+     * https://graphql.org/learn/serving-over-http/
+     */
+    async getGraphQLQuery(
+        request: HTTPRequest
+    ): Promise<{
+        query: string;
+        operationName?: string;
+        variables?: { [key: string]: any };
+    } | null> {
         switch (request.method.toLowerCase()) {
             case "get":
-                return request.query.get("query");
+                const query = request.query.get("query");
+                const operationName =
+                    request.query.get("operationName") || undefined;
+                const variables = request.query.get("variables") || undefined;
+
+                if (query === null) return null;
+
+                try {
+                    return {
+                        query: query,
+                        operationName: operationName,
+                        variables:
+                            variables !== undefined
+                                ? JSON.parse(variables)
+                                : undefined,
+                    };
+                } catch (e) {
+                    // parse failed
+                    return null;
+                }
 
             case "post":
                 switch (request.headers.get("content-type")) {
                     case "application/json":
-                        return ((await request.json()) as { query: string })
-                            .query;
+                        return (await request.json()) as {
+                            query: string;
+                            operationName?: string;
+                            variables?: { [key: string]: any };
+                        };
 
                     case "application/graphql":
-                        return await request.text();
+                        return {
+                            query: await request.text(),
+                        };
                 }
         }
 
         return null;
     }
 
+    /**
+     * GraphQL HTTP endpoint
+     */
     async handleGraphQLRequest(
         schema: GraphQLSchema,
         request: HTTPRequest
     ): Promise<HTTPResponse> {
-        const query = await this.getGraphQLQuery(request);
+        const graphQLRequest = await this.getGraphQLQuery(request);
 
-        if (query === null) {
+        if (graphQLRequest === null) {
             return { status: 400, text: "400 bad request" };
         }
 
         return {
-            json: await graphql(schema, query),
+            json: await graphql(
+                schema,
+                graphQLRequest.query,
+                undefined,
+                undefined,
+                graphQLRequest.variables,
+                graphQLRequest.operationName
+            ),
         };
     }
 
@@ -260,6 +303,7 @@ export type ContentType =
 export type HTTPHeaders = {
     "content-type"?: ContentType;
     "set-cookie"?: CookieJar;
+    authorization?: string;
     "access-control-allow-origin"?: string;
     "access-control-allow-headers"?: string;
     "access-control-allow-methods"?: string;

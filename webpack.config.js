@@ -15,6 +15,9 @@ const common = {
         maxEntrypointSize: 1024 * 1024,
         maxAssetSize: 1024 * 1024,
     },
+    node: {
+        fs: "empty",
+    },
 };
 
 const merge = (a, b) => Object.assign({}, a, b);
@@ -55,74 +58,74 @@ module.exports = [
     /**
      * Options for the (static) frontend
      */
-    merge(common, {
-        entry: "./src/frontend/index.tsx",
-        output: {
-            filename: "[name].js",
-            path: path.join(__dirname, "dist/static"),
-        },
-        module: {
-            rules: [
-                {
-                    test: /\.tsx?$/,
-                    exclude: /node_modules/,
-                    use: [babelLoader, "ts-loader"],
-                },
-                {
-                    test: /\.css$/,
-                    use: ["style-loader", "css-loader"],
-                },
-                {
-                    test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
-                    use: [
-                        {
-                            loader: "file-loader",
-                            options: {
-                                name: "[name].[ext]",
-                                outputPath: "fonts/",
-                            },
-                        },
-                    ],
-                },
-                {
-                    test: /\.(gif|png|jpe?g|svg)$/,
-                    use: [
-                        {
-                            loader: "file-loader",
-                            options: {
-                                name: "[name].[ext]",
-                                outputPath: "images/",
-                            },
-                        },
-                    ],
-                },
-            ],
-        },
-        plugins: [
-            new webpack.HashedModuleIdsPlugin(),
-            new HTMLWebpackPlugin({
-                filename: "index.html",
-                template: "src/frontend/index.ejs",
-            }),
-        ],
-        optimization: {
-            splitChunks: {
-                chunks: "all",
-                maxInitialRequests: Infinity,
-                minSize: 0,
-                cacheGroups: {
-                    vendor: {
-                        test: /[\\/]node_modules[\\/]/,
-                        name(module) {
-                            const packageName = module.context.match(
-                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
-                            )[1];
+    // merge(common, {
+    //     entry: "./src/frontend/index.tsx",
+    //     output: {
+    //         filename: "[name].js",
+    //         path: path.join(__dirname, "dist/static"),
+    //     },
+    //     module: {
+    //         rules: [
+    //             {
+    //                 test: /\.tsx?$/,
+    //                 exclude: /node_modules/,
+    //                 use: [babelLoader, "ts-loader"],
+    //             },
+    //             {
+    //                 test: /\.css$/,
+    //                 use: ["style-loader", "css-loader"],
+    //             },
+    //             {
+    //                 test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
+    //                 use: [
+    //                     {
+    //                         loader: "file-loader",
+    //                         options: {
+    //                             name: "[name].[ext]",
+    //                             outputPath: "fonts/",
+    //                         },
+    //                     },
+    //                 ],
+    //             },
+    //             {
+    //                 test: /\.(gif|png|jpe?g|svg)$/,
+    //                 use: [
+    //                     {
+    //                         loader: "file-loader",
+    //                         options: {
+    //                             name: "[name].[ext]",
+    //                             outputPath: "images/",
+    //                         },
+    //                     },
+    //                 ],
+    //             },
+    //         ],
+    //     },
+    //     plugins: [
+    //         new webpack.HashedModuleIdsPlugin(),
+    //         new HTMLWebpackPlugin({
+    //             filename: "index.html",
+    //             template: "src/frontend/index.ejs",
+    //         }),
+    //     ],
+    //     optimization: {
+    //         splitChunks: {
+    //             chunks: "all",
+    //             maxInitialRequests: Infinity,
+    //             minSize: 0,
+    //             cacheGroups: {
+    //                 vendor: {
+    //                     test: /[\\/]node_modules[\\/]/,
+    //                     name(module) {
+    //                         const packageName = module.context.match(
+    //                             /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+    //                         )[1];
 
-                            return `npm.${packageName.replace("@", "")}`;
-                        },
-                    },
-                },
-            },
-        },
-    }),
+    //                         return `npm.${packageName.replace("@", "")}`;
+    //                     },
+    //                 },
+    //             },
+    //         },
+    //     },
+    // }),
 ];

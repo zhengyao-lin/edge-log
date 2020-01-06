@@ -94,25 +94,6 @@ export class Post {
     }
 }
 
-export class Session {
-    @KeyProperty.unique(Session)
-    public id: string;
-
-    @KeyProperty.primary(Session)
-    private timeOfCreation: number;
-
-    constructor(config: Partial<Session> = {}) {
-        this.id = uuid4();
-        this.timeOfCreation = new Date().getTime();
-
-        Object.assign(this, config);
-    }
-
-    getTimeOfCreation(): Date {
-        return new Date(this.timeOfCreation);
-    }
-}
-
 export class EdgeLog {
     static PATH_ADMIN_CONFIG = ["config", "admin"];
     static PATH_POST_COLLECTION = ["posts"];
@@ -120,7 +101,6 @@ export class EdgeLog {
 
     public siteConfig: SiteConfig;
     public postCollection: Collection<Post>;
-    public sessionCollection: Collection<Session>;
 
     constructor(private base: Directory<JSONEncodable>) {
         this.base = base;
@@ -131,29 +111,6 @@ export class EdgeLog {
             base.enter(EdgeLog.PATH_POST_COLLECTION),
             Post
         );
-
-        this.sessionCollection = new Collection(
-            base.enter(EdgeLog.PATH_SESSION_COLLECTION),
-            Session
-        );
-    }
-
-    /**
-     * Checks the given passcode and returns a new session if it's correct
-     * Otherwise returns null
-     */
-    async login(passcode: string): Promise<Session | null> {
-        if (await this.siteConfig.checkPasscode(passcode)) {
-            const session = new Session();
-            await this.sessionCollection.add(session);
-            return session;
-        }
-
-        return null;
-    }
-
-    async checkSession(id: string): Promise<Session | null> {
-        return await this.sessionCollection.getByUniqueKey("id", id);
     }
 
     async addPost(post: Post) {

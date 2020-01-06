@@ -1,23 +1,24 @@
 import { URIPathEncoding } from "../framework/storage/path";
-import { EdgeLog, Post } from "./models";
+import { EdgeLog } from "./models";
 
 import { WorkerStringKVStore, WorkerStreamKVStore } from "./worker";
 import {
     Application,
     HTTPResponse,
     HTTPRequest,
-    CookieJar,
 } from "../framework/router/application";
 import { JSONEncoding } from "../framework/storage/encoding";
 import { EncodedStore, KeyEncodedStore } from "../framework/storage/kv";
 import { Directory } from "../framework/storage/containers/directory";
 
 import { KVNamespace } from "@cloudflare/workers-types";
-import { validate, keyof } from "../framework/router/json-schema";
 
 import { apiSchema } from "./schema";
-import { graphql } from "graphql";
-import { ExecutionResultDataDefault } from "graphql/execution/execute";
+
+import { sign as jwtSign, verify as jwtVerify } from "jsonwebtoken";
+import { assert } from "../framework/utils";
+
+import { fromByteArray } from "base64-js";
 
 declare global {
     const TEST_KV: KVNamespace;
@@ -45,21 +46,26 @@ const blog = new EdgeLog(
 const schema = apiSchema(blog);
 
 class MainApplication extends Application {
-    async authenticated(
-        request: HTTPRequest,
-        callback: () => Promise<HTTPResponse>
-    ): Promise<HTTPResponse> {
-        const sessionID = request.cookie["session-id"];
+    // @Application.get("/auth")
+    // async handleAuthentication(request: HTTPRequest): Promise<HTTPResponse> {
+    //     try {
+    //         const auth = request.headers.get("authorization");
+    //         const passcodeBase64 = auth!.substring("Basic ".length);
 
-        if (
-            sessionID === undefined ||
-            (await blog.checkSession(sessionID)) === null
-        ) {
-            return { status: 401, text: "unauthorized" };
-        }
+    //         const passcode = fromByteArray(
+    //             Uint8Array.from(new TextEncoder().encode(passcodeBase64))
+    //         );
+    //         assert(await blog.siteConfig.checkPasscode(passcode));
 
-        return await callback();
-    }
+    //         const token = jwtSign({}, "", {
+    //             expiresIn: 60 * 10,
+    //         });
+
+    //         return { text: token };
+    //     } catch (e) {
+    //         return { status: 401, text: "401 unauthorized" };
+    //     }
+    // }
 
     @Application.options("/api")
     async handleOptionsGraphQL(request: HTTPRequest): Promise<HTTPResponse> {
@@ -82,34 +88,6 @@ class MainApplication extends Application {
                 "access-control-allow-origin": "*",
                 "access-control-allow-headers": "*",
                 "access-control-allow-methods": "POST,GET,OPTIONS",
-            },
-        };
-    }
-
-    @Application.post("/api/login")
-    async handleLogin(request: HTTPRequest): Promise<HTTPResponse> {
-        const cred = validate(await request.json(), {
-            type: "object",
-            properties: {
-                passcode: { type: "string" },
-            },
-            required: ["passcode"],
-            additionalItems: false,
-        });
-
-        if (cred === null) {
-            return { status: 400, text: "bad request" };
-        }
-
-        const session = await blog.login(cred.passcode);
-
-        if (session === null) {
-            return { status: 401, text: "unauthorized" };
-        }
-
-        return {
-            headers: {
-                "set-cookie": new CookieJar(`session-id=${session.id}`),
             },
         };
     }
