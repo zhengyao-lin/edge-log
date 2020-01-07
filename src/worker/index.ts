@@ -16,9 +16,6 @@ import { KVNamespace } from "@cloudflare/workers-types";
 import { apiSchema } from "./schema";
 
 import { sign as jwtSign, verify as jwtVerify } from "jsonwebtoken";
-import { assert } from "../framework/utils";
-
-import { fromByteArray } from "base64-js";
 
 declare global {
     const TEST_KV: KVNamespace;
@@ -46,50 +43,38 @@ const blog = new EdgeLog(
 const schema = apiSchema(blog);
 
 class MainApplication extends Application {
-    // @Application.get("/auth")
-    // async handleAuthentication(request: HTTPRequest): Promise<HTTPResponse> {
-    //     try {
-    //         const auth = request.headers.get("authorization");
-    //         const passcodeBase64 = auth!.substring("Basic ".length);
+    @Application.get("/auth")
+    async handleAuthentication(request: HTTPRequest): Promise<HTTPResponse> {
+        const auth = request.getAuthorization();
 
-    //         const passcode = fromByteArray(
-    //             Uint8Array.from(new TextEncoder().encode(passcodeBase64))
-    //         );
-    //         assert(await blog.siteConfig.checkPasscode(passcode));
+        if (auth === null || !("basic" in auth)) {
+            return this.handleUnauthorized(request, "basic");
+        }
 
-    //         const token = jwtSign({}, "", {
-    //             expiresIn: 60 * 10,
-    //         });
+        const [_, passcode] = auth.basic;
 
-    //         return { text: token };
-    //     } catch (e) {
-    //         return { status: 401, text: "401 unauthorized" };
-    //     }
-    // }
+        if (!(await blog.siteConfig.checkPasscode(passcode))) {
+            return this.handleUnauthorized(request, "basic");
+        }
+
+        const token = jwtSign({}, "", {
+            expiresIn: 60 * 10,
+        });
+
+        return { text: token };
+    }
 
     @Application.options("/api")
+    @Application.allowCORS("*", ["*"], ["*"])
     async handleOptionsGraphQL(request: HTTPRequest): Promise<HTTPResponse> {
-        return {
-            status: 204,
-            headers: {
-                "access-control-allow-origin": "*",
-                "access-control-allow-headers": "*",
-                "access-control-allow-methods": "POST,GET,OPTIONS",
-            },
-        };
+        return { status: 204 };
     }
 
     @Application.get("/api")
     @Application.post("/api")
+    @Application.allowCORS("*", ["*"], ["*"])
     async handleGraphQL(request: HTTPRequest): Promise<HTTPResponse> {
-        return {
-            ...(await this.handleGraphQLRequest(schema, request)),
-            headers: {
-                "access-control-allow-origin": "*",
-                "access-control-allow-headers": "*",
-                "access-control-allow-methods": "POST,GET,OPTIONS",
-            },
-        };
+        return await this.handleGraphQLRequest(schema, request);
     }
 
     /**
@@ -97,14 +82,14 @@ class MainApplication extends Application {
      */
     @Application.get("/static/(.*)")
     async handleStatic(
-        request: Request,
+        request: HTTPRequest,
         filePath: string
     ): Promise<HTTPResponse> {
         const path = filePath.split("/");
         const stream = await fileStore.get(path);
 
         if (stream === null) {
-            return { status: 404, text: "no such file" };
+            return await this.handleNotFound(request);
         }
 
         return {
@@ -116,7 +101,7 @@ class MainApplication extends Application {
     }
 
     @Application.get("/version")
-    async handleVersion(): Promise<HTTPResponse> {
+    async handleVersion(request: HTTPRequest): Promise<HTTPResponse> {
         return { json: { version: "0.0.1" } };
     }
 }

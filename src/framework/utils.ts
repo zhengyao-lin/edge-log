@@ -1,4 +1,5 @@
 import uuid from "uuid";
+import { fromByteArray } from "base64-js";
 
 export function assert(
     condition: boolean,
@@ -11,4 +12,12 @@ export function assert(
 
 export function uuid4(): string {
     return uuid.v4();
+}
+
+export function base64Decode(encoded: string): string | null {
+    try {
+        return fromByteArray(new TextEncoder().encode(encoded));
+    } catch (e) {
+        return null;
+    }
 }
