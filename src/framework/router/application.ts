@@ -1,5 +1,5 @@
 import { graphql, GraphQLSchema } from "graphql";
-import { base64Decode } from "../utils";
+import { Base64Encoding } from "../utils";
 
 /**
  * Minimal web application framework
@@ -58,17 +58,15 @@ export class HTTPRequest {
 
     getAuthorization(): Authorization | null {
         let auth = this.headers.get("authorization");
-
         if (auth === null) return null;
 
         const firstSpace = auth.indexOf(" ");
-
         if (firstSpace == -1) return null;
 
         switch (auth.substring(0, firstSpace)) {
             case "Basic":
                 const tokenBase64 = auth.substring(firstSpace + 1);
-                const token = base64Decode(tokenBase64);
+                const token = new Base64Encoding().decode(tokenBase64);
                 if (token === null) return null;
 
                 const firstColon = token.indexOf(":");
@@ -100,6 +98,7 @@ export type Preprocessor = (request: HTTPRequest) => Promise<HTTPRequest>;
 export type Postprocessor = (response: HTTPResponse) => Promise<HTTPResponse>;
 
 export type HTTPMethod = "get" | "post" | "put" | "delete" | "options";
+export type HTTPAuthorizationType = "Basic" | "Bearer";
 
 export type ContentType =
     | "application/json"
@@ -250,7 +249,7 @@ export abstract class Application {
 
     async handleUnauthorized(
         request: HTTPRequest,
-        type: string = "Basic",
+        type: HTTPAuthorizationType = "Basic",
         realm?: string
     ): Promise<HTTPResponse> {
         return {

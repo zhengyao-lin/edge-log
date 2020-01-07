@@ -5,7 +5,7 @@ import {
 } from "../framework/storage/containers/collection";
 import { Configuration } from "../framework/storage/containers/configuration";
 import BLAKE2s from "blake2s-js";
-import { uuid4 } from "../framework/utils";
+import { uuid4, UTF8Encoding } from "../framework/utils";
 import { Directory } from "../framework/storage/containers/directory";
 import { JSONEncodable } from "../framework/storage/encoding";
 
@@ -61,7 +61,7 @@ export class SiteConfig extends Configuration<SiteConfigObject> {
             SiteConfig.DEFAULT_OUTLEN,
             SiteConfig.DEFAULT_KEY
         );
-        h.update(new TextEncoder().encode(msg));
+        h.update(new UTF8Encoding().encode(msg));
         return h.hexDigest();
     }
 

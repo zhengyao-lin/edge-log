@@ -107,4 +107,5 @@ dist
 .vscode-test
 
 dist/
+secret/
 cred.sh

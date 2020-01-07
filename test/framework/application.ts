@@ -6,6 +6,7 @@ import {
 } from "../../src/framework/router/application";
 
 import { Request, Response } from "node-fetch";
+import { Base64Encoding } from "../../src/framework/utils";
 
 (global as any).Request = Request;
 (global as any).Response = Response;
@@ -24,6 +25,32 @@ class App2 extends Application {
         return { text: "app2" };
     }
 }
+
+describe("http request", () => {
+    it("parses Authorization header correctly", () => {
+        let request = new Request("https://foo.com/test", {
+            method: "GET",
+            headers: {
+                "Authorization": "Basic "
+            }
+        });
+
+        let parsedRequest = new HTTPRequest(request as any);
+
+        expect(parsedRequest.getAuthorization()).eql({ basic: ["", ""] });
+
+        request = new Request("https://foo.com/test", {
+            method: "GET",
+            headers: {
+                "Authorization": "Basic " + new Base64Encoding().encode("user:pass")
+            }
+        });
+
+        parsedRequest = new HTTPRequest(request as any);
+
+        expect(parsedRequest.getAuthorization()).eql({ basic: ["user", "pass"] });
+    });
+});
 
 describe("application", () => {
     const app1 = new App1();
