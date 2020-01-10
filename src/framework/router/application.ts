@@ -273,43 +273,41 @@ export abstract class Application {
         operationName?: string;
         variables?: { [key: string]: any };
     } | null> {
-        switch (request.method) {
-            case "get":
-                const query = request.query.get("query");
-                const operationName =
-                    request.query.get("operationName") || undefined;
-                const variables = request.query.get("variables") || undefined;
+        const query = request.query.get("query");
 
-                if (query === null) return null;
+        if (request.method == "get" || query !== null) {
+            const query = request.query.get("query");
+            const operationName =
+                request.query.get("operationName") || undefined;
+            const variables = request.query.get("variables") || undefined;
 
-                try {
-                    return {
-                        query: query,
-                        operationName: operationName,
-                        variables:
-                            variables !== undefined
-                                ? JSON.parse(variables)
-                                : undefined,
-                    };
-                } catch (e) {
-                    // parse failed
-                    return null;
-                }
+            if (query === null) return null;
 
-            case "post":
-                switch (request.headers.get("content-type")) {
-                    case "application/json":
-                        return (await request.json()) as {
-                            query: string;
-                            operationName?: string;
-                            variables?: { [key: string]: any };
-                        };
-
-                    case "application/graphql":
-                        return {
-                            query: await request.text(),
-                        };
-                }
+            try {
+                return {
+                    query: query,
+                    operationName: operationName,
+                    variables:
+                        variables !== undefined
+                            ? JSON.parse(variables)
+                            : undefined,
+                };
+            } catch (e) {
+                // parse failed
+                return null;
+            }
+        } else if (request.method == "post") {
+            if (request.headers.get("content-type") === "application/graphql") {
+                return {
+                    query: await request.text(),
+                };
+            } else {
+                return (await request.json()) as {
+                    query: string;
+                    operationName?: string;
+                    variables?: { [key: string]: any };
+                };
+            }
         }
 
         return null;

@@ -60,7 +60,7 @@ class MainApplication extends Application {
         this.secretDir = new Directory(
             new KeyEncodedStore(
                 new WorkerStringKVStore(TEST_KV),
-                new URIPathEncoding(),
+                new URIPathEncoding()
             ),
             MainApplication.SECRET_PATH
         );
@@ -73,7 +73,7 @@ class MainApplication extends Application {
             ),
             MainApplication.DATA_PATH
         );
-        
+
         this.model = new EdgeLog(this.dataDir);
         this.apiSchema = apiSchema(this.model);
     }
@@ -86,7 +86,9 @@ class MainApplication extends Application {
             return this.handleUnauthorized(request, "Bearer");
         }
 
-        const publicKey = await this.secretDir.get(MainApplication.JWT_PUBLIC_KEY_PATH);
+        const publicKey = await this.secretDir.get(
+            MainApplication.JWT_PUBLIC_KEY_PATH
+        );
 
         if (publicKey === null) {
             return this.handleInternalError(request);
@@ -117,7 +119,9 @@ class MainApplication extends Application {
             return this.handleUnauthorized(request, "Basic");
         }
 
-        const privateKey = await this.secretDir.get(MainApplication.JWT_PRIVATE_KEY_PATH);
+        const privateKey = await this.secretDir.get(
+            MainApplication.JWT_PRIVATE_KEY_PATH
+        );
 
         if (privateKey === null) {
             return this.handleInternalError(request);

@@ -6,7 +6,7 @@ const common = {
     mode: process.env.NODE_ENV || "production",
     // devtool: "inline-source-map",
     resolve: {
-        extensions: [".ts", ".tsx", ".js", ".jsx", "mjs"],
+        extensions: [".ts", ".tsx", ".js", ".jsx", "mjs"]
     },
     output: {
         path: path.join(__dirname, "dist"),
@@ -27,6 +27,87 @@ const babelLoader = {
     options: {
         presets: ["@babel/env", "@babel/preset-react"],
     },
+};
+
+const genFrontEndConfig = entries => {
+    const plugins = [];
+
+    for (const key in entries) {
+        plugins.push(
+            new HTMLWebpackPlugin({
+                chunks: [key],
+                filename: path.basename(key) + ".html",
+                template: "src/frontend/template.ejs",
+            })
+        );
+    }
+
+    return {
+        entry: entries,
+        output: {
+            filename: "[name].js",
+            path: path.join(__dirname, "dist/static"),
+        },
+        module: {
+            rules: [
+                {
+                    test: /\.tsx?$/,
+                    exclude: /node_modules/,
+                    use: [babelLoader, "ts-loader"],
+                },
+                {
+                    test: /\.css$/,
+                    use: ["style-loader", "css-loader"],
+                },
+                {
+                    test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
+                    use: [
+                        {
+                            loader: "file-loader",
+                            options: {
+                                name: "[name].[ext]",
+                                outputPath: "fonts/",
+                            },
+                        },
+                    ],
+                },
+                {
+                    test: /\.(gif|png|jpe?g|svg)$/,
+                    use: [
+                        {
+                            loader: "file-loader",
+                            options: {
+                                name: "[name].[ext]",
+                                outputPath: "images/",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+        plugins: [
+            // new webpack.HashedModuleIdsPlugin(),
+        ].concat(plugins),
+        optimization: {
+            splitChunks: {
+                chunks: "all",
+                maxInitialRequests: Infinity,
+                minSize: 0,
+                cacheGroups: {
+                    vendor: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name(module) {
+                            const packageName = module.context.match(
+                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                            )[1];
+
+                            return `npm.${packageName.replace("@", "")}`;
+                        },
+                    },
+                },
+            },
+        },
+    };
 };
 
 module.exports = [
@@ -58,74 +139,10 @@ module.exports = [
     /**
      * Options for the (static) frontend
      */
-    // merge(common, {
-    //     entry: "./src/frontend/index.tsx",
-    //     output: {
-    //         filename: "[name].js",
-    //         path: path.join(__dirname, "dist/static"),
-    //     },
-    //     module: {
-    //         rules: [
-    //             {
-    //                 test: /\.tsx?$/,
-    //                 exclude: /node_modules/,
-    //                 use: [babelLoader, "ts-loader"],
-    //             },
-    //             {
-    //                 test: /\.css$/,
-    //                 use: ["style-loader", "css-loader"],
-    //             },
-    //             {
-    //                 test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
-    //                 use: [
-    //                     {
-    //                         loader: "file-loader",
-    //                         options: {
-    //                             name: "[name].[ext]",
-    //                             outputPath: "fonts/",
-    //                         },
-    //                     },
-    //                 ],
-    //             },
-    //             {
-    //                 test: /\.(gif|png|jpe?g|svg)$/,
-    //                 use: [
-    //                     {
-    //                         loader: "file-loader",
-    //                         options: {
-    //                             name: "[name].[ext]",
-    //                             outputPath: "images/",
-    //                         },
-    //                     },
-    //                 ],
-    //             },
-    //         ],
-    //     },
-    //     plugins: [
-    //         new webpack.HashedModuleIdsPlugin(),
-    //         new HTMLWebpackPlugin({
-    //             filename: "index.html",
-    //             template: "src/frontend/index.ejs",
-    //         }),
-    //     ],
-    //     optimization: {
-    //         splitChunks: {
-    //             chunks: "all",
-    //             maxInitialRequests: Infinity,
-    //             minSize: 0,
-    //             cacheGroups: {
-    //                 vendor: {
-    //                     test: /[\\/]node_modules[\\/]/,
-    //                     name(module) {
-    //                         const packageName = module.context.match(
-    //                             /[\\/]node_modules[\\/](.*?)([\\/]|$)/
-    //                         )[1];
-
-    //                         return `npm.${packageName.replace("@", "")}`;
-    //                     },
-    //                 },
-    //             },
-    //         },
-    //     },
-    // }),
+    merge(
+        common,
+        genFrontEndConfig({
+            main: ["@babel/polyfill", "./src/frontend/pages/main.tsx"],
+        })
+    ),
 ];

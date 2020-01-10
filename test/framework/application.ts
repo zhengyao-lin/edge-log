@@ -31,8 +31,8 @@ describe("http request", () => {
         let request = new Request("https://foo.com/test", {
             method: "GET",
             headers: {
-                "Authorization": "Basic "
-            }
+                Authorization: "Basic ",
+            },
         });
 
         let parsedRequest = new HTTPRequest(request as any);
@@ -42,13 +42,16 @@ describe("http request", () => {
         request = new Request("https://foo.com/test", {
             method: "GET",
             headers: {
-                "Authorization": "Basic " + new Base64Encoding().encode("user:pass")
-            }
+                Authorization:
+                    "Basic " + new Base64Encoding().encode("user:pass"),
+            },
         });
 
         parsedRequest = new HTTPRequest(request as any);
 
-        expect(parsedRequest.getAuthorization()).eql({ basic: ["user", "pass"] });
+        expect(parsedRequest.getAuthorization()).eql({
+            basic: ["user", "pass"],
+        });
     });
 });
 
