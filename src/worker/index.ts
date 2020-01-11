@@ -16,7 +16,6 @@ import { KVNamespace } from "@cloudflare/workers-types";
 import { apiSchema } from "./schema";
 
 import { sign as jwtSign, verify as jwtVerify } from "jsonwebtoken";
-import { Path } from "graphql/jsutils/Path";
 import { GraphQLSchema } from "graphql";
 
 declare global {

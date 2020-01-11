@@ -75,7 +75,7 @@ const PostList: FunctionalComponent = props => {
 const Entry: FunctionalComponent = props => {
     return (
         <GraphQLProvider value={client}>
-            <Container style={{ "padding": "1.5em", "font-family": "monospace" }}>
+            <Container style={{ padding: "1.5em", "font-family": "monospace" }}>
                 <PostList />
             </Container>
         </GraphQLProvider>
