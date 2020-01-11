@@ -1,4 +1,4 @@
-import { assert } from "../../utils";
+import { assert } from "../../../common";
 import { Encoding, BaseReductionEncoding, JSONEncodable } from "../encoding";
 import { Directory } from "./directory";
 

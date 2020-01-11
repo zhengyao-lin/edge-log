@@ -1,4 +1,4 @@
-export type ExplicitMeasure = { em: number } | { rem: number };
+export type ExplicitMeasure = { em: number } | { rem: number } | { px: number };
 
 export type Height =
     | "height-tiny"
@@ -43,6 +43,10 @@ export function measureToSize(measure: Measure): [number, string] {
         return [(measure as any).rem, "rem"];
     }
 
+    if (measure.hasOwnProperty("px")) {
+        return [(measure as any).px, "px"];
+    }
+
     if (measure instanceof Array) {
         const [multiplier, submeasure] = measure;
         const [size, unit] = measureToSize(submeasure);
@@ -65,8 +69,8 @@ export function measureToSize(measure: Measure): [number, string] {
         "width-full": [100, "%"],
 
         "gap-small": [1, "em"],
-        "gap-medium": [2, "em"],
-        "gap-big": [3, "em"],
+        "gap-medium": [3, "em"],
+        "gap-big": [5, "em"],
     };
 
     return measureMap[measure as Exclude<typeof measure, ExplicitMeasure>];

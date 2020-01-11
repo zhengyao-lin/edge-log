@@ -1,5 +1,5 @@
 import { graphql, GraphQLSchema } from "graphql";
-import { Base64Encoding } from "../utils";
+import { Base64Encoding } from "../storage/encoding";
 
 /**
  * Minimal web application framework

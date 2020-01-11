@@ -6,7 +6,7 @@ import {
 } from "../../src/framework/router/application";
 
 import { Request, Response } from "node-fetch";
-import { Base64Encoding } from "../../src/framework/utils";
+import { Base64Encoding } from "../../src/framework/storage/encoding";
 
 (global as any).Request = Request;
 (global as any).Response = Response;

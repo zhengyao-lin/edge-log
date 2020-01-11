@@ -8,21 +8,30 @@ import { useCallback, useEffect, useRef } from "preact/hooks";
  */
 export const useMediaQuery = (
     query: string,
-    positiveAction: () => void,
-    negativeAction: () => void
+    positiveAction: () => void = () => {},
+    negativeAction: () => void = () => {}
 ) => {
     const mediaQueryList = useRef(window.matchMedia(query));
 
-    const handleChange = useCallback((event: MediaQueryListEvent) => {
-        if (event.matches) {
-            positiveAction();
-        } else {
-            negativeAction();
-        }
-    }, [query]);
+    const handleChange = useCallback(
+        (event: MediaQueryListEvent) => {
+            if (event.matches) {
+                positiveAction();
+            } else {
+                negativeAction();
+            }
+        },
+        [query]
+    );
 
     useEffect(() => {
         mediaQueryList.current.addListener(handleChange);
         return () => mediaQueryList.current.removeListener(handleChange);
     }, [query]);
+
+    if (mediaQueryList.current.matches) {
+        useEffect(positiveAction, [query]);
+    } else {
+        useEffect(negativeAction, [query]);
+    }
 };

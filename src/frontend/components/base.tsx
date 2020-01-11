@@ -4,7 +4,6 @@ import {
     VNode,
     ComponentType,
     RenderableProps,
-    Fragment,
 } from "preact";
 import { JSXInternal } from "preact/src/jsx";
 
@@ -49,23 +48,37 @@ export const Heading6: FunctionalComponent<JSXInternal.HTMLAttributes<
 >> = props => <h6 {...props}>{props.children}</h6>;
 
 /**
- * A mutually exclusive intersection of three records:
- * { as: ... } & P & E
+ * A type-level Object.assign
  */
-export type BaseProps<P, E = {}> = {
-    as: ComponentType<P>;
-} & {
-    [K in Exclude<keyof E, "as">]?: E[K];
-} &
+export type Assign<A, B> = B &
     {
-        [K in Exclude<keyof P, "as" | keyof E>]?: P[K];
+        [K in Exclude<keyof A, keyof B>]?: A[K];
     };
+
+/**
+ * Extend the inferred props with a new
+ * `as` property and extension E
+ */
+export type BaseProps<P, E = {}> = Assign<
+    P,
+    {
+        as?: ComponentType<P>;
+    } & E
+>;
+
+// {
+//     as: ComponentType<P>;
+// } & {
+//     [K in Exclude<keyof E, "as">]?: E[K];
+// } & {
+//     [K in Exclude<keyof P, "as" | keyof E>]?: P[K];
+// };
 
 export type InternalProperty<
     K extends keyof JSXInternal.HTMLAttributes<HTMLElement>
-> = { [P in K]: JSXInternal.HTMLAttributes<HTMLElement>[P] };
+> = { [P in K]: undefined | JSXInternal.HTMLAttributes<HTMLElement>[P] };
 
 export function Base<P>(props: RenderableProps<BaseProps<P>>): VNode {
-    const Child = props.as as ComponentType<any>;
+    const Child = (props.as || Div) as ComponentType<any>;
     return <Child {...props}>{props.children}</Child>;
 }

@@ -5,9 +5,9 @@ import {
 } from "../framework/storage/containers/collection";
 import { Configuration } from "../framework/storage/containers/configuration";
 import BLAKE2s from "blake2s-js";
-import { uuid4, UTF8Encoding } from "../framework/utils";
 import { Directory } from "../framework/storage/containers/directory";
-import { JSONEncodable } from "../framework/storage/encoding";
+import { JSONEncodable, UTF8Encoding } from "../framework/storage/encoding";
+import uuid from "uuid";
 
 /**
  * Models for a single-admin blogging platform
@@ -88,7 +88,7 @@ export class Post {
         this.timeOfCreation = new Date().getTime();
         this.timeOfLastEdit = new Date().getTime();
 
-        this.id = uuid4();
+        this.id = uuid.v4();
 
         Object.assign(this, config);
     }

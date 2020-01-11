@@ -8,7 +8,7 @@ import {
     GraphQLList,
     GraphQLNonNull,
 } from "graphql";
-import { assert } from "../framework/utils";
+import { assert } from "../common";
 
 function typeFromGQL(name: string, source: string): GraphQLObjectType {
     const type = buildSchema(source).getType(name);

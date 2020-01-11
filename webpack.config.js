@@ -6,7 +6,7 @@ const common = {
     mode: process.env.NODE_ENV || "production",
     // devtool: "inline-source-map",
     resolve: {
-        extensions: [".ts", ".tsx", ".js", ".jsx", "mjs"]
+        extensions: [".ts", ".tsx", ".js", ".jsx", "mjs"],
     },
     output: {
         path: path.join(__dirname, "dist"),
